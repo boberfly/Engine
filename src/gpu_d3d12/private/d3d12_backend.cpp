@@ -786,6 +786,12 @@ namespace GPU
 		return ErrorCode::UNIMPLEMENTED;
 	}
 
+	ErrorCode CreateSemaphore(Handle handle, const char* debugName)
+	{
+		//
+		return ErrorCode::UNIMPLEMENTED;
+	}
+
 	ErrorCode D3D12Backend::DestroyResource(Handle handle)
 	{
 		switch(handle.GetType())

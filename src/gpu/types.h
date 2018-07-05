@@ -219,11 +219,43 @@ namespace GPU
 		DEPTH_STENCIL = 0x00000080,
 		UNORDERED_ACCESS = 0x00000100,
 		PRESENT = 0x00000200,
+		// These are for The-Forge.
+		OWN_MEMORY_BIT = 0x00000400,
+		PERSISTENT_MAP_BIT = 0x00000800,
+		ESRAM = 0x00001000,
+		NO_DESCRIPTOR_VIEW_CREATION = 0x00004000,
+		EXPORT_BIT = 0x00008000,
+		EXPORT_ADAPTER_BIT = 0x00010000,
+		IMPORT_BIT = 0x00020000,
+		ON_TILE = 0x00040000,
+		NO_COMPRESSION = 0x00080000,
 	};
 
 	DEFINE_ENUM_CLASS_FLAG_OPERATOR(BindFlags, &);
 	DEFINE_ENUM_CLASS_FLAG_OPERATOR(BindFlags, |);
 
+
+	/**
+	 * Resource memory usage. Used by The-Forge.
+	 */
+	enum class MemoryUsage : i32
+	{
+		INVALID = -1,
+		UNKNOWN = 0,
+		GPU_ONLY,
+		CPU_ONLY,
+		CPU_TO_GPU,
+		GPU_TO_CPU,
+	};
+
+	/**
+	 * Index type. Used by The-Forge.
+	 */
+	enum class IndexType : u32
+	{
+		UINT32 = 0,
+		UINT16,
+	};
 
 	/**
 	 * Texture types.

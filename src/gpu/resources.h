@@ -27,6 +27,7 @@ namespace GPU
 
 		COMMAND_LIST,
 		FENCE,
+		SEMAPHORE,
 
 		MAX
 	};
@@ -73,6 +74,13 @@ namespace GPU
 	struct GPU_DLL BufferDesc
 	{
 		BindFlags bindFlags_ = BindFlags::NONE;
+		MemoryUsage memoryUsage_ = MemoryUsage::UNKNOWN;
+		Format format_ = Format::INVALID;
+		IndexType indexType_ = IndexType::UINT32;
+		u32 vertexStride_ = 0;
+		u64 firstElement_ = 0;
+		u64 elementCount_ = 0;
+		u64 structStride_ = 0;
 		i64 size_ = 0;
 	};
 
@@ -148,6 +156,7 @@ namespace GPU
 		BlendType destBlendAlpha_ = BlendType::ONE;
 		BlendFunc blendOpAlpha_ = BlendFunc::ADD;
 		u8 writeMask_ = 0xf;
+		bool alphaToCoverage_ = false;
 	};
 
 	/**
