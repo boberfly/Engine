@@ -458,6 +458,8 @@ namespace GPU
 		const char* api_ = nullptr;
 		/// Device window to use.
 		void* deviceWindow_ = nullptr;
+		/// Display (x11).
+		void* display_ = nullptr;
 		/// Debuggers to natively support integration of.
 		DebugFlags debugFlags_ = DebugFlags::NONE;
 	};

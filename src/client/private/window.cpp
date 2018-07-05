@@ -301,6 +301,7 @@ namespace Client
 		data.handle_ = (void*)wmInfo.info.win.window;
 #elif PLATFORM_LINUX
 		data.handle_ = (void*)wmInfo.info.x11.window;
+		data.display_ = (void*)wmInfo.info.x11.display;
 #elif PLATFORM_OSX
 		data.handle_ = (void*)wmInfo.info.cocoa.window;
 #elif PLATFORM_ANDROID

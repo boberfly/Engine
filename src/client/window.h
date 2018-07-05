@@ -11,6 +11,7 @@ namespace Client
 	struct WindowPlatformData
 	{
 		void* handle_ = nullptr;
+		void* display_ = nullptr;
 	};
 
 	class CLIENT_DLL Window final
