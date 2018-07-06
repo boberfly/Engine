@@ -65,26 +65,22 @@ namespace GPU
 
 		void CreateStaticSamplers();
 		void CreateCommandQueues();
-		void CreateRootSignatures();
 		void CreateCommandSignatures();
-		void CreateDefaultPSOs();
-		void CreateUploadAllocators();
-		void CreateDescriptorAllocators();
 
 		/**
-		 * Will return D3D12Resource for a @a handle.
+		 * Will return TFResource for a @a handle.
 		 * Supports BUFFER, TEXTURE, and SWAP_CHAIN.
 		 */
 		GPU::ResourceRead<TFResource> GetTFResource(GPU::Handle handle);
 
 		/**
-		 * Will return D3D12Buffer for a @a handle.
+		 * Will return TFBuffer for a @a handle.
 		 * Supports BUFFER.
 		 */
 		GPU::ResourceRead<TFBuffer> GetTFBuffer(GPU::Handle handle);
 
 		/**
-		 * Will return D3D12Resource for a @a handle.
+		 * Will return TFResource for a @a handle.
 		 * Supports TEXTURE and SWAP_CHAIN.
 		 * @param bufferIdx If >= 0, will return appropriate buffer for swapchain.
 		 */
@@ -95,8 +91,12 @@ namespace GPU
 		/// Cached adapter infos.
 		Core::Vector<GPU::AdapterInfo> adapterInfos_;
 
-		/// TheForge Renderer.
+		/// The-Forge Renderer.
 		::Renderer* renderer_ = nullptr;
+
+		// Command queues.
+		::Queue* tfDirectQueue_;       // direct
+		::Queue* tfAsyncComputeQueue_; // compute
 
 		/// Resources.
 		GPU::ResourcePool<TFSwapChain> swapchainResources_;
@@ -116,16 +116,10 @@ namespace GPU
 		/// Static samplers.
 		Core::Vector<::Sampler*> tfStaticSamplers_;
 
-		/// Root signatures.
-		Core::Vector<::RootSignature*> tfRootSignatures_;
-
 		/// Command signatures
 		::CommandSignature* tfDrawCmdSig_;
 		::CommandSignature* tfDrawIndexedCmdSig_;
 		::CommandSignature* tfDispatchCmdSig_;
-
-		Core::Vector<::Pipeline*> tfDefaultPSOs_;
-
 	};
 
 } // namespace GPU

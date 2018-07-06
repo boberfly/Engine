@@ -7,7 +7,7 @@ SET(SOURCES_PUBLIC
 	"tf_command_list.h"
 	"tf_compile_context.h"
 #	"tf_descriptor_heap_allocator.h"
-	"tf_device.h"
+#	"tf_device.h"
 #	"tf_linear_heap_allocator.h"
 #	"tf_linear_descriptor_allocator.h"
 	"tf_resources.h"
@@ -18,7 +18,7 @@ SET(SOURCES_PUBLIC
 SET(SOURCES_PRIVATE 
 	"private/tf_backend.cpp"
 #	"private/tf_descriptor_heap_allocator.cpp"
-	"private/tf_device.cpp"
+#	"private/tf_device.cpp"
 	"private/tf_command_list.cpp"
 	"private/tf_compile_context.cpp"
 #	"private/tf_linear_heap_allocator.cpp"

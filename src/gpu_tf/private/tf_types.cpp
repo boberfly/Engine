@@ -141,8 +141,8 @@ namespace GPU
 			return RENDER_TARGET_TYPE_2D;
 		case TextureType::TEX3D:
 			return RENDER_TARGET_TYPE_3D;
-		//case TextureType::BUFFER:
-		//	return TEXTURE_TYPE_BUFFER;
+		case TextureType::BUFFER:
+			return RENDER_TARGET_TYPE_BUFFER;
 		default:
 			return RENDER_TARGET_TYPE_UNKNOWN;
 		}

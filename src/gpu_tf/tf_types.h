@@ -26,17 +26,17 @@ namespace GPU
 	/**
 	 * Conversion.
 	 */
-	::BufferUsage GPU::GetBufferUsage(GPU::BindFlags bindFlags);
-	::ResourceState GPU::GetResourceStates(GPU::BindFlags bindFlags);
-	::ResourceMemoryUsage GPU::GetResourceMemoryUsage(GPU::MemoryUsage usage);
-	::BufferCreationFlags GPU::GetBufferCreationFlags(GPU::BindFlags bindFlags);
+	::BufferUsage GetBufferUsage(GPU::BindFlags bindFlags);
+	::ResourceState GetResourceStates(GPU::BindFlags bindFlags);
+	::ResourceMemoryUsage GetResourceMemoryUsage(GPU::MemoryUsage usage);
+	::BufferCreationFlags GetBufferCreationFlags(GPU::BindFlags bindFlags);
 	::TextureType GetTextureType(GPU::TextureType type);
-	::TextureUsage GPU::GetTextureUsage(GPU::BindFlags bindFlags);
-	::TextureCreationFlags GPU::GetTextureCreationFlags(GPU::BindFlags bindFlags);
+	::TextureUsage GetTextureUsage(GPU::BindFlags bindFlags);
+	::TextureCreationFlags GetTextureCreationFlags(GPU::BindFlags bindFlags);
 	::ImageFormat::Enum GetImageFormat(GPU::Format format);
 	bool GetSrgbFormat(GPU::Format format);
 	::PrimitiveTopology GetPrimitiveTopology(GPU::PrimitiveTopology topology);
-	::BufferDesc GPU::GetBufferDesc(const GPU::BufferDesc& desc, const char* debugName);
+	::BufferDesc GetBufferDesc(const GPU::BufferDesc& desc, const char* debugName);
 	::TextureDesc GetTextureDesc(const GPU::TextureDesc& desc, const char* debugName);
 	::RenderTargetDesc GetRenderTargetDesc(const GPU::TextureDesc& desc, const char* debugName);
 

@@ -267,6 +267,7 @@ namespace GPU
 		TEX2D,
 		TEX3D,
 		TEXCUBE,
+		BUFFER, // Used for creating a RenderTarget for The-Forge.
 	};
 
 	/**

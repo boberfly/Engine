@@ -1,7 +1,7 @@
 #include "gpu_tf/tf_backend.h"
 #include "gpu_tf/tf_device.h"
-#include "gpu_tf/tf_linear_heap_allocator.h"
-#include "gpu_tf/tf_linear_descriptor_allocator.h"
+//#include "gpu_tf/tf_linear_heap_allocator.h"
+//#include "gpu_tf/tf_linear_descriptor_allocator.h"
 #include "core/debug.h"
 #include "core/string.h"
 
@@ -148,7 +148,6 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		::initRenderer("Engine", &settings, &renderer_);
 		if(!renderer_)
 		{
-			delete renderer_;
 			renderer_ = nullptr;
 			return ErrorCode::FAIL;
 		}
@@ -227,12 +226,12 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		if(Core::ContainsAllFlags(desc.bindFlags_, RENDER_TARGET))
 		{
 			::RenderTargetDesc tfRenderTargetDesc = GetRenderTargetDesc(desc, debugName);
-			::addRenderTarget(renderer_, &tfRenderTargetDesc, &renderTarget->renderTarget_);
+			::addRenderTarget(renderer_, &tfRenderTargetDesc, &texture->renderTarget_);
 
-			if(!renderTarget->renderTarget_)
+			if(!texture->renderTarget_)
 				return ErrorCode::FAIL;
 
-			renderTarget->texture_ = renderTarget->renderTarget_->pTexture;
+			texture->texture_ = &(*Texture)texture->renderTarget_->pTexture;
 		}
 		else
 		{
@@ -699,23 +698,8 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 				auto buffer = GetTFBuffer(desc.ib_.resource_);
 				DBG_ASSERT(buffer);
 
-				DBG_ASSERT(Core::ContainsAllFlags(buffer->supportedStates_, D3D12_RESOURCE_STATE_INDEX_BUFFER));
+				DBG_ASSERT(Core::ContainsAllFlags(buffer->supportedStates_, RESOURCE_STATE_INDEX_BUFFER));
 				dbs->ibResource_ = &(*buffer);
-
-				dbs->ib_.BufferLocation = buffer->resource_->GetGPUVirtualAddress() + desc.ib_.offset_;
-				dbs->ib_.SizeInBytes = Core::PotRoundUp(desc.ib_.size_, D3D12_TEXTURE_DATA_PITCH_ALIGNMENT);
-				switch(desc.ib_.stride_)
-				{
-				case 2:
-					dbs->ib_.Format = DXGI_FORMAT_R16_UINT;
-					break;
-				case 4:
-					dbs->ib_.Format = DXGI_FORMAT_R32_UINT;
-					break;
-				default:
-					return ErrorCode::FAIL;
-					break;
-				}
 			}
 
 			i32 idx = 0;
@@ -723,15 +707,11 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 			{
 				if(vb.resource_)
 				{
-					auto buffer = GetD3D12Buffer(vb.resource_);
+					auto buffer = GetTFBuffer(vb.resource_);
 					DBG_ASSERT(buffer);
 					DBG_ASSERT(Core::ContainsAllFlags(
-					    buffer->supportedStates_, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
+					    buffer->supportedStates_, RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
 					dbs->vbResources_[idx] = &(*buffer);
-
-					dbs->vbs_[idx].BufferLocation = buffer->resource_->GetGPUVirtualAddress() + vb.offset_;
-					dbs->vbs_[idx].SizeInBytes = vb.size_;
-					dbs->vbs_[idx].StrideInBytes = vb.stride_;
 				}
 				++idx;
 			}
@@ -748,8 +728,6 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		{
 			Core::Vector<::RenderTargetDesc> rtvDescs;
 			::RenderTargetDesc dsvDesc;
-			//Core::Vector<D3D12_RENDER_TARGET_VIEW_DESC> rtvDescs;
-			//D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc;
 
 			// Check if we're using a swapchain.
 			{
@@ -777,7 +755,7 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 							//Core::Vector<::RenderTarget*> renderTargets_;
 		//::RenderTarget* dsRenderTarget_;
 					//D3D12SubresourceRange& rtvResource = fbs->renderTargets_[rtvIdx + bufferIdx * MAX_BOUND_RTVS];
-					RenderTarget* renderTarget = fbs->renderTargets_[rtvIdx + bufferIdx * MAX_BOUND_RTVS];
+					//RenderTarget* renderTarget = fbs->renderTargets_[rtvIdx + bufferIdx * MAX_BOUND_RTVS];
 					const auto& rtv = desc.rtvs_[rtvIdx];
 					Handle resource = rtv.resource_;
 					if(resource)
@@ -795,75 +773,19 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 						if(fbs->swapChain_)
 						{
 							rtvDesc = swapChain_->swapChain_->ppSwapchainRenderTargets[swapChain_->bbIdx_].mDesc;
-							renderTarget = swapChain_->swapChain_->ppSwapchainRenderTargets[swapChain_->bbIdx_];
-							continue;
+							//renderTarget = swapChain_->swapChain_->ppSwapchainRenderTargets[swapChain_->bbIdx_];
 						}
 
-	/// Type of texture (1D, 2D, 3D, Cube)
-	RenderTargetType		rtvDesc.mType =;
-	/// Texture creation flags (decides memory allocation strategy, sharing access,...)
-	TextureCreationFlags	rtvDesc.mFlags =;
-	/// Width
-	uint32_t				rtvDesc.mWidth =;
-	/// Height
-	uint32_t				rtvDesc.mHeight =;
-	/// Depth (Should be 1 if not a mType is not TEXTURE_TYPE_3D)
-	uint32_t				rtvDesc.mDepth =;
-	/// Start array layer (Should be between 0 and max array layers for this texture)
-	uint32_t				rtvDesc.mBaseArrayLayer =;
-	/// Texture array size (Should be 1 if texture is not a texture array or cubemap)
-	uint32_t				rtvDesc.mArraySize =;
-	/// Mip level to render into
-	uint32_t				rtvDesc.mBaseMipLevel =;
-	/// Number of multisamples per pixel (currently Textures created with mUsage TEXTURE_USAGE_SAMPLED_IMAGE only support SAMPLE_COUNT_1)
-	SampleCount				rtvDesc.mSampleCount =;
-	/// Internal image format
-	ImageFormat::Enum		rtvDesc.mFormat =;
-	/// Optimized clear value (recommended to use this same value when clearing the rendertarget)
-	ClearValue				rtvDesc.mClearValue =;
-	/// Flags specifying suitable usage of the texture(UAV, SRV, RTV, DSV)
-	RenderTargetUsage		rtvDesc.mUsage =;
-	/// The image quality level. The higher the quality, the lower the performance. The valid range is between zero and the value appropriate for mSampleCount
-	uint32_t				rtvDesc.mSampleQuality =;
-	const void*				rtvDesc.pNativeHandle =;
-	/// Debug name used in gpu profile
-	const wchar_t*				rtvDesc.pDebugName =;
-	/// Set whether rendertarget is srgb
-	bool					rtvDesc.mSrgb =;
-	/// Gpu index to create resource
-	uint32_t*				rtvDesc.pSharedNodeIndices =;
-	uint32_t				rtvDesc.mSharedNodeIndexCount =;
-	uint32_t				rtvDesc.mNodeIndex =;
-
-						rtvDesc.Format = GetFormat(rtv.format_);
-						rtvDesc.ViewDimension = GetRTVDimension(rtv.dimension_);
 						switch(rtv.dimension_)
 						{
 						case ViewDimension::BUFFER:
 							return ErrorCode::UNSUPPORTED;
 							break;
 						case ViewDimension::TEX1D:
-							rtvDesc.Texture1D.MipSlice = rtv.mipSlice_;
-							break;
 						case ViewDimension::TEX1D_ARRAY:
-							rtvDesc.Texture1DArray.ArraySize = rtv.arraySize_;
-							rtvDesc.Texture1DArray.FirstArraySlice = rtv.firstArraySlice_;
-							rtvDesc.Texture1DArray.MipSlice = rtv.mipSlice_;
-							break;
 						case ViewDimension::TEX2D:
-							rtvDesc.Texture2D.MipSlice = rtv.mipSlice_;
-							rtvDesc.Texture2D.PlaneSlice = rtv.planeSlice_FirstWSlice_;
-							break;
 						case ViewDimension::TEX2D_ARRAY:
-							rtvDesc.Texture2DArray.MipSlice = rtv.mipSlice_;
-							rtvDesc.Texture2DArray.FirstArraySlice = rtv.firstArraySlice_;
-							rtvDesc.Texture2DArray.ArraySize = rtv.arraySize_;
-							rtvDesc.Texture2DArray.PlaneSlice = rtv.planeSlice_FirstWSlice_;
-							break;
 						case ViewDimension::TEX3D:
-							rtvDesc.Texture3D.FirstWSlice = rtv.planeSlice_FirstWSlice_;
-							rtvDesc.Texture3D.MipSlice = rtv.mipSlice_;
-							rtvDesc.Texture3D.WSize = rtv.wSize_;
 							break;
 						default:
 							DBG_ASSERT(false);
@@ -879,37 +801,24 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 				Handle resource = dsv.resource_;
 				if(resource)
 				{
-					D3D12SubresourceRange& dsvResource = fbs->dsvResource_;
+					TFSubresourceRange& dsvResource = fbs->dsvResource_;
 					DBG_ASSERT(resource.GetType() == ResourceType::TEXTURE);
-					auto texture = GetD3D12Texture(resource);
+					auto texture = GetTFTexture(resource);
 					DBG_ASSERT(Core::ContainsAnyFlags(
-					    texture->supportedStates_, D3D12_RESOURCE_STATE_DEPTH_WRITE | D3D12_RESOURCE_STATE_DEPTH_READ));
+					    texture->supportedStates_, RESOURCE_STATE_DEPTH_WRITE | RESOURCE_STATE_DEPTH_READ));
 					dsvResource.resource_ = &(*texture);
 					dsvResource.firstSubRsc_ = 0;
 					dsvResource.numSubRsc_ = texture->numSubResources_;
 
-					dsvDesc.Format = GetFormat(dsv.format_);
-					dsvDesc.ViewDimension = GetDSVDimension(dsv.dimension_);
 					switch(dsv.dimension_)
 					{
 					case ViewDimension::BUFFER:
 						return ErrorCode::UNSUPPORTED;
 						break;
 					case ViewDimension::TEX1D:
-						dsvDesc.Texture1D.MipSlice = dsv.mipSlice_;
-						break;
 					case ViewDimension::TEX1D_ARRAY:
-						dsvDesc.Texture1DArray.ArraySize = dsv.arraySize_;
-						dsvDesc.Texture1DArray.FirstArraySlice = dsv.firstArraySlice_;
-						dsvDesc.Texture1DArray.MipSlice = dsv.mipSlice_;
-						break;
 					case ViewDimension::TEX2D:
-						dsvDesc.Texture2D.MipSlice = dsv.mipSlice_;
-						break;
 					case ViewDimension::TEX2D_ARRAY:
-						dsvDesc.Texture2DArray.MipSlice = dsv.mipSlice_;
-						dsvDesc.Texture2DArray.FirstArraySlice = dsv.firstArraySlice_;
-						dsvDesc.Texture2DArray.ArraySize = dsv.arraySize_;
 						break;
 					default:
 						DBG_ASSERT(false);
@@ -918,10 +827,6 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 					}
 				}
 			}
-
-			ErrorCode retVal;
-			RETURN_ON_ERROR(retVal = device_->CreateFrameBindingSet(*fbs, fbs->desc_, debugName));
-			RETURN_ON_ERROR(retVal = device_->UpdateFrameBindingSet(*fbs, rtvDescs.data(), &dsvDesc));
 		}
 
 		return ErrorCode::OK;
@@ -982,6 +887,7 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 			if(auto texture = bufferResources_.Write(handle))
 			{
 				removeResource(renderer_, texture->texture_);
+				removeResource(renderer_, texture->renderTarget_);
 				*texture = TFTexture();
 			}
 			break;
@@ -1014,25 +920,13 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 			}
 			break;
 		case ResourceType::PIPELINE_BINDING_SET:
-			if(auto pbs = pipelineBindingSets_.Write(handle))
-			{
-				device_->DestroyPipelineBindingSet(*pbs);
-				*pbs = TFPipelineBindingSet();
-			}
+			*pipelineBindingSets_.Write(handle) = TFPipelineBindingSet();
 			break;
 		case ResourceType::DRAW_BINDING_SET:
 			*drawBindingSets_.Write(handle) = TFDrawBindingSet();
 			break;
 		case ResourceType::FRAME_BINDING_SET:
-			if(auto fbs = frameBindingSets_.Write(handle))
-			{
-				for(i32 i = 0; i < renderTargets_.size(), ++i)
-				{
-					removeRenderTarget(renderer_, fbs->renderTargets_[i]);
-				}
-				removeRenderTarget(renderer_, fbs->dsRenderTarget_);
-				*fbs = TFFrameBindingSet();
-			}
+			*frameBindingSets_.Write(handle) = TFFrameBindingSet();
 			break;
 		case ResourceType::COMMAND_LIST:
 			if(auto commandList = commandLists_.Write(handle))
@@ -1579,13 +1473,13 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 
 		::addQueue(renderer_, &directQueueDesc, &tfDirectQueue_);
 
-		::QueueDesc asyncQueueDesc = {};
-		asyncQueueDesc.mFlag = QUEUE_FLAG_NONE;
-		asyncQueueDesc.mPriority = QUEUE_PRIORITY_NORMAL;
-		asyncQueueDesc.mType = CMD_POOL_COMPUTE;
-		asyncQueueDesc.mNodeIndex = 0;
+		::QueueDesc asyncComputeQueueDesc = {};
+		asyncComputeQueueDesc.mFlag = QUEUE_FLAG_NONE;
+		asyncComputeQueueDesc.mPriority = QUEUE_PRIORITY_NORMAL;
+		asyncComputeQueueDesc.mType = CMD_POOL_COMPUTE;
+		asyncComputeQueueDesc.mNodeIndex = 0;
 
-		::addQueue(renderer_, &asyncQueueDesc, &tfDirectQueue_);
+		::addQueue(renderer_, &asyncComputeQueueDesc, &tfAsyncComputeQueue_);
 	}
 
 	void GPU::TFBackend::CreateStaticSamplers()
@@ -1598,116 +1492,77 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 
 	void GPU::TFDevice::CreateCommandSignatures()
 	{
-		//D3D12_INDIRECT_ARGUMENT_DESC drawArg = {};
-		//drawArg.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
-
 		::IndirectArgumentDescriptor drawArg = {};
 		drawArg.mType = IndirectArgumentType::INDIRECT_DRAW;
-		//uint32_t indirectArgumentDesc.mRootParameterIndex = ;
-		//uint32_t indirectArgumentDesc.mCount;
-		//uint32_t indirectArgumentDesc.mDivisor;
-
-		//D3D12_INDIRECT_ARGUMENT_DESC drawIndexedArg = {};
-		//drawIndexedArg.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+		drawArg.mRootParameterIndex = 0;
+		drawArg.mCount = 0;
+		drawArg.mDivisor = 0;
 
 		::IndirectArgumentDescriptor drawIndexedArg = {};
 		drawIndexedArg.mType = IndirectArgumentType::INDIRECT_DRAW_INDEX;
-		//uint32_t indirectArgumentDesc.mRootParameterIndex = ;
-		//uint32_t indirectArgumentDesc.mCount;
-		//uint32_t indirectArgumentDesc.mDivisor;
-
-		//D3D12_INDIRECT_ARGUMENT_DESC dispatchArg = {};
-		//dispatchArg.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
+		drawArg.mRootParameterIndex = 0;
+		drawArg.mCount = 0;
+		drawArg.mDivisor = 0;
 
 		::IndirectArgumentDescriptor dispatchArg = {};
 		dispatchArg.mType = IndirectArgumentType::INDIRECT_DISPATCH;
-		//uint32_t indirectArgumentDesc.mRootParameterIndex = ;
-		//uint32_t indirectArgumentDesc.mCount;
-		//uint32_t indirectArgumentDesc.mDivisor;
-
-		//D3D12_COMMAND_SIGNATURE_DESC drawDesc = {};
-		//drawDesc.ByteStride = sizeof(DrawArgs);
-		//drawDesc.NumArgumentDescs = 1;
-		//drawDesc.pArgumentDescs = &drawArg;
-		//drawDesc.NodeMask = 0x0;
+		drawArg.mRootParameterIndex = 0;
+		drawArg.mCount = 0;
+		drawArg.mDivisor = 0;
 
 		::CommandSignatureDesc drawDesc = {};
-	CmdPool*					drawDesc.pCmdPool =;
-	RootSignature*				drawDesc.pRootSignature = ;
-	uint32_t					drawDesc.mIndirectArgCount = 1;
+		//drawDesc.pCmdPool =;
+		drawDesc.pRootSignature = nullptr; // Unused, but asserts on The-Forge (make a PR)
+		drawDesc.mIndirectArgCount = 1;
 		drawDesc.pArgDescs = &drawArg;
 
-		//D3D12_COMMAND_SIGNATURE_DESC drawIndexedDesc = {};
-		//drawIndexedDesc.ByteStride = sizeof(DrawIndexedArgs);
-		//drawIndexedDesc.NumArgumentDescs = 1;
-		//drawIndexedDesc.pArgumentDescs = &drawIndexedArg;
-		//drawIndexedDesc.NodeMask = 0x0;
-
 		::CommandSignatureDesc drawIndexedDesc = {};
-	CmdPool*					drawIndexedDesc.pCmdPool =;
-	RootSignature*				drawIndexedDesc.pRootSignature = ;
-	uint32_t					drawIndexedDesc.mIndirectArgCount = 1;
-		drawIndexedDesc.pArgDescs = &drawArg;
-
-		//D3D12_COMMAND_SIGNATURE_DESC dispatchDesc = {};
-		//dispatchDesc.ByteStride = sizeof(DispatchArgs);
-		//dispatchDesc.NumArgumentDescs = 1;
-		//dispatchDesc.pArgumentDescs = &dispatchArg;
-		//dispatchDesc.NodeMask = 0x0;
+		//drawIndexedDesc.pCmdPool =;
+		drawIndexedDesc.pRootSignature = nullptr; // Unused, but asserts on The-Forge (make a PR)
+		drawIndexedDesc.mIndirectArgCount = 1;
+		drawIndexedDesc.pArgDescs = &drawIndexedArg;
 
 		::CommandSignatureDesc dispatchDesc = {};
-	CmdPool*					dispatchDesc.pCmdPool =;
-	RootSignature*				dispatchDesc.pRootSignature = ;
-	uint32_t					dispatchDesc.mIndirectArgCount = 1;
-		dispatchDesc.pArgDescs = &drawArg;
-
-		//CHECK_D3D(d3dDevice_->CreateCommandSignature(
-		//    &drawDesc, nullptr, IID_ID3D12CommandSignature, (void**)d3dDrawCmdSig_.GetAddressOf()));
-		//SetObjectName(d3dDrawCmdSig_.Get(), "DrawIndirect");
+		//dispatchDesc.pCmdPool =;
+		dispatchDesc.pRootSignature = nullptr; // Unused, but asserts on The-Forge (make a PR)
+		dispatchDesc.mIndirectArgCount = 1;
+		dispatchDesc.pArgDescs = &dispatchArg;
 
 		::addIndirectCommandSignature(renderer_, &drawDesc, &tfDrawCmdSig_);
 		::addIndirectCommandSignature(renderer_, &drawIndexedDesc, &tfDrawIndexedCmdSig_);
 		::addIndirectCommandSignature(renderer_, &dispatchDesc, &tfDispatchCmdSig_);
-
-		//CHECK_D3D(d3dDevice_->CreateCommandSignature(
-		//    &drawIndexedDesc, nullptr, IID_ID3D12CommandSignature, (void**)d3dDrawIndexedCmdSig_.GetAddressOf()));
-		//SetObjectName(d3dDrawIndexedCmdSig_.Get(), "DrawIndexedIndirect");
-
-		//CHECK_D3D(d3dDevice_->CreateCommandSignature(
-		//    &dispatchDesc, nullptr, IID_ID3D12CommandSignature, (void**)d3dDispatchCmdSig_.GetAddressOf()));
-		//SetObjectName(d3dDispatchCmdSig_.Get(), "DispatchIndirect");
 	}
 
-	GPU::ResourceRead<D3D12Resource> GPU::TFBackend::GetD3D12Resource(Handle handle)
+	GPU::ResourceRead<TFResource> GPU::TFBackend::GetTFResource(Handle handle)
 	{
 		if(handle.GetType() == ResourceType::BUFFER)
 		{
 			auto buffer = bufferResources_.Read(handle);
-			return ResourceRead<D3D12Resource>(std::move(buffer), *buffer);
+			return ResourceRead<TFResource>(std::move(buffer), *buffer);
 		}
 		else if(handle.GetType() == ResourceType::TEXTURE)
 		{
 			auto texture = textureResources_.Read(handle);
-			return ResourceRead<D3D12Resource>(std::move(texture), *texture);
+			return ResourceRead<TFResource>(std::move(texture), *texture);
 		}
 		else if(handle.GetType() == ResourceType::SWAP_CHAIN)
 		{
 			auto swapChain = swapchainResources_.Read(handle);
-			return ResourceRead<D3D12Resource>(std::move(swapChain), swapChain->textures_[swapChain->bbIdx_]);
+			return ResourceRead<TFResource>(std::move(swapChain), *swapChain);
 		}
-		return ResourceRead<D3D12Resource>();
+		return ResourceRead<TFResource>();
 	}
 
-	GPU::ResourceRead<D3D12Buffer> GPU::TFBackend::GetTFBuffer(Handle handle)
+	GPU::ResourceRead<TFBuffer> GPU::TFBackend::GetTFBuffer(Handle handle)
 	{
 		if(handle.GetType() != ResourceType::BUFFER)
-			return ResourceRead<D3D12Buffer>();
+			return ResourceRead<TFBuffer>();
 		if(handle.GetIndex() >= bufferResources_.size())
-			return ResourceRead<D3D12Buffer>();
+			return ResourceRead<TFBuffer>();
 		return bufferResources_.Read(handle);
 	}
 
-	GPU::ResourceRead<D3D12Texture> GPU::TFBackend::GetTFTexture(Handle handle, i32 bufferIdx)
+	GPU::ResourceRead<TFTexture> GPU::TFBackend::GetTFTexture(Handle handle, i32 bufferIdx)
 	{
 		if(handle.GetType() == ResourceType::TEXTURE)
 		{
@@ -1716,9 +1571,9 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		else if(handle.GetType() == ResourceType::SWAP_CHAIN)
 		{
 			auto swapChain = swapchainResources_.Read(handle);
-			return ResourceRead<D3D12Texture>(std::move(swapChain), swapChain->textures_[swapChain->bbIdx_]);
+			return ResourceRead<TFTexture>(std::move(swapChain), *swapChain);
 		}
-		return ResourceRead<D3D12Texture>();
+		return ResourceRead<TFTexture>();
 	}
 
 //} // namespace GPU
