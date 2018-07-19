@@ -235,11 +235,44 @@ namespace GPU
 	ErrorCode D3D12Backend::CreateShader(Handle handle, const ShaderDesc& desc, const char* debugName)
 	{
 		auto shader = shaders_.Write(handle);
-		shader->byteCode_ = new u8[desc.dataSize_];
-		shader->byteCodeSize_ = desc.dataSize_;
-		memcpy(shader->byteCode_, desc.data_, desc.dataSize_);
 
-		return ErrorCode::OK;
+		auto GetShader = [&](ShaderType shaderType) {
+			if(desc.dataSize_[(i32)shaderType] > 0)
+			{
+				shader->byteCode_[(i32)shaderType] = new u8[(i32)desc.dataSize_[(i32)shaderType]];
+				shader->byteCodeSize_[(i32)shaderType] = desc.dataSize_[(i32)shaderType];
+				memcpy(shader->byteCode_[(i32)shaderType], desc.data_[(i32)shaderType], desc.dataSize_[(i32)shaderType]);
+			}
+			else
+			{
+				shader->byteCode_[(i32)shaderType] = nullptr;
+				shader->byteCodeSize_[(i32)shaderType] = 0;
+			}
+		};
+
+		if(desc.dataSize_[(i32)ShaderType::CS] > 0)
+		{
+			GetShader(ShaderType::CS);
+
+			return ErrorCode::OK;
+		}
+		else if(desc.dataSize_[(i32)ShaderType::VS] > 0)
+		{
+			GetShader(ShaderType::VS);
+			GetShader(ShaderType::PS);
+			GetShader(ShaderType::GS);
+			GetShader(ShaderType::HS);
+			GetShader(ShaderType::DS);
+
+			return ErrorCode::OK;
+		}
+
+		return ErrorCode::FAIL;
+	}
+
+	ErrorCode D3D12Backend::CreateRootSignature(Handle handle, const RootSignatureDesc& desc, const char* debugName)
+	{
+		return ErrorCode::UNIMPLEMENTED;
 	}
 
 	ErrorCode D3D12Backend::CreateGraphicsPipelineState(
@@ -250,12 +283,11 @@ namespace GPU
 
 		auto GetShaderBytecode = [&](ShaderType shaderType) {
 			D3D12_SHADER_BYTECODE byteCode = {};
-			auto shaderHandle = desc.shaders_[(i32)shaderType];
-			if(shaderHandle)
+			auto shader = shaders_.Read(desc.shader_);
+			if(shader->byteCodeSize_[(i32)shaderType] > 0)
 			{
-				auto shader = shaders_.Read(shaderHandle);
-				byteCode.pShaderBytecode = shader->byteCode_;
-				byteCode.BytecodeLength = shader->byteCodeSize_;
+				byteCode.pShaderBytecode = shader->byteCode_[(i32)shaderType];
+				byteCode.BytecodeLength = shader->byteCodeSize_[(i32)shaderType];
 			}
 			return byteCode;
 		};
@@ -547,8 +579,8 @@ namespace GPU
 
 		{
 			auto shader = shaders_.Read(desc.shader_);
-			cpsDesc.CS.BytecodeLength = shader->byteCodeSize_;
-			cpsDesc.CS.pShaderBytecode = shader->byteCode_;
+			cpsDesc.CS.BytecodeLength = shader->byteCodeSize_[(i32)ShaderType::CS];
+			cpsDesc.CS.pShaderBytecode = shader->byteCode_[(i32)ShaderType::CS];
 			cpsDesc.NodeMask = 0x0;
 		}
 
@@ -786,7 +818,7 @@ namespace GPU
 		return ErrorCode::UNIMPLEMENTED;
 	}
 
-	ErrorCode CreateSemaphore(Handle handle, const char* debugName)
+	ErrorCode D3D12Backend::CreateSemaphore(Handle handle, const char* debugName)
 	{
 		//
 		return ErrorCode::UNIMPLEMENTED;
@@ -808,9 +840,16 @@ namespace GPU
 		case ResourceType::SHADER:
 			if(auto shader = shaders_.Write(handle))
 			{
-				delete[] shader->byteCode_;
+				for(i32 i = 0; i < (i32)ShaderType::MAX; ++i)
+				{
+					if(shader->byteCode_[i])
+						delete[] shader->byteCode_[i];
+				}
 				*shader = D3D12Shader();
 			}
+			break;
+		case ResourceType::ROOT_SIGNATURE:
+			*rootSignatures_.Write(handle) = D3D12RootSignature();
 			break;
 		case ResourceType::GRAPHICS_PIPELINE_STATE:
 			*graphicsPipelineStates_.Write(handle) = D3D12GraphicsPipelineState();

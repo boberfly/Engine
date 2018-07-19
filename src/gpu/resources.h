@@ -18,6 +18,7 @@ namespace GPU
 		BUFFER,
 		TEXTURE,
 		SHADER,
+		ROOT_SIGNATURE,
 		GRAPHICS_PIPELINE_STATE,
 		COMPUTE_PIPELINE_STATE,
 
@@ -137,9 +138,16 @@ namespace GPU
 	 */
 	struct GPU_DLL ShaderDesc
 	{
-		ShaderType type_ = ShaderType::INVALID;
-		const void* data_ = nullptr;
-		i32 dataSize_ = 0;
+		const void* data_[(i32)ShaderType::MAX] = {nullptr};
+		i32 dataSize_[(i32)ShaderType::MAX] = {0};
+	};
+
+	/**
+	 * RootSignatureDesc.
+	 */
+	struct GPU_DLL RootSignatureDesc
+	{
+		Core::ArrayView<Handle> shaders_;
 	};
 
 	/**
@@ -203,7 +211,8 @@ namespace GPU
 	 */
 	struct GPU_DLL GraphicsPipelineStateDesc
 	{
-		Handle shaders_[5];
+		Handle shader_;
+		Handle rootSignature_;
 		RenderState renderState_;
 		i32 numVertexElements_ = 0;
 		VertexElement vertexElements_[MAX_VERTEX_ELEMENTS];
@@ -220,6 +229,7 @@ namespace GPU
 	struct GPU_DLL ComputePipelineStateDesc
 	{
 		Handle shader_;
+		Handle rootSignature_;
 	};
 
 	/**

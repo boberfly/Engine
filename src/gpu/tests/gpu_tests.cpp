@@ -369,15 +369,44 @@ TEST_CASE("gpu-tests-create-shader")
 	GPU::Manager::ScopedDebugCapture capture(testName.c_str());
 
 	GPU::ShaderDesc desc;
-	desc.type_ = GPU::ShaderType::CS;
-	desc.dataSize_ = sizeof(g_CShader);
-	desc.data_ = g_CShader;
+	desc.dataSize_[(i32)GPU::ShaderType::CS] = sizeof(g_CShader);
+	desc.data_[(i32)GPU::ShaderType::CS] = g_CShader;
 
 	GPU::Handle handle = GPU::Manager::CreateShader(desc, testName.c_str());
 	REQUIRE(handle);
 	GPU::Manager::DestroyResource(handle);
 }
 
+TEST_CASE("gpu-tests-create-root-signature")
+{
+	auto testName = Catch::getResultCapture().getCurrentTestName();
+
+	Plugin::Manager::Scoped pluginManager;
+	Client::Window window(testName.c_str(), 0, 0, 640, 480, false);
+	GPU::Manager::Scoped gpuManager(GetDefaultSetupParams());
+
+	i32 numAdapters = GPU::Manager::EnumerateAdapters(nullptr, 0);
+	REQUIRE(numAdapters > 0);
+
+	REQUIRE(GPU::Manager::CreateAdapter(0) == GPU::ErrorCode::OK);
+
+	GPU::Manager::ScopedDebugCapture capture(testName.c_str());
+
+	GPU::ShaderDesc desc;
+	desc.dataSize_[(i32)GPU::ShaderType::CS] = sizeof(g_CShader);
+	desc.data_[(i32)GPU::ShaderType::CS] = g_CShader;
+
+	GPU::Handle shaderHandle = GPU::Manager::CreateShader(desc, testName.c_str());
+	REQUIRE(shaderHandle);
+
+	GPU::RootSignatureDesc rsDesc;
+
+	GPU::Handle rsHandle = GPU::Manager::CreateRootSignature(rsDesc, testName.c_str());
+	REQUIRE(rsHandle);
+
+	GPU::Manager::DestroyResource(rsHandle);
+	GPU::Manager::DestroyResource(shaderHandle);
+}
 
 TEST_CASE("gpu-tests-create-compute-pipeline-state")
 {
@@ -395,19 +424,25 @@ TEST_CASE("gpu-tests-create-compute-pipeline-state")
 	GPU::Manager::ScopedDebugCapture capture(testName.c_str());
 
 	GPU::ShaderDesc shaderDesc;
-	shaderDesc.type_ = GPU::ShaderType::CS;
-	shaderDesc.dataSize_ = sizeof(g_CShader);
-	shaderDesc.data_ = g_CShader;
+	shaderDesc.dataSize_[(i32)GPU::ShaderType::CS] = sizeof(g_CShader);
+	shaderDesc.data_[(i32)GPU::ShaderType::CS] = g_CShader;
 
 	GPU::Handle shaderHandle = GPU::Manager::CreateShader(shaderDesc, testName.c_str());
 	REQUIRE(shaderHandle);
 
+	GPU::RootSignatureDesc rsDesc;
+
+	GPU::Handle rsHandle = GPU::Manager::CreateRootSignature(rsDesc, testName.c_str());
+	REQUIRE(rsHandle);
+
 	GPU::ComputePipelineStateDesc pipelineDesc;
 	pipelineDesc.shader_ = shaderHandle;
+	pipelineDesc.rootSignature_ = rsHandle;
 	GPU::Handle pipelineHandle = GPU::Manager::CreateComputePipelineState(pipelineDesc, testName.c_str());
 	REQUIRE(pipelineHandle);
 
 	GPU::Manager::DestroyResource(pipelineHandle);
+	GPU::Manager::DestroyResource(rsHandle);
 	GPU::Manager::DestroyResource(shaderHandle);
 }
 
@@ -427,9 +462,8 @@ TEST_CASE("gpu-tests-create-pipeline-binding-set")
 	GPU::Manager::ScopedDebugCapture capture(testName.c_str());
 
 	GPU::ShaderDesc shaderDesc;
-	shaderDesc.type_ = GPU::ShaderType::CS;
-	shaderDesc.dataSize_ = sizeof(g_CShader);
-	shaderDesc.data_ = g_CShader;
+	shaderDesc.dataSize_[(i32)GPU::ShaderType::CS] = sizeof(g_CShader);
+	shaderDesc.data_[(i32)GPU::ShaderType::CS] = g_CShader;
 
 	// Create resources to test bindings.
 	GPU::Handle texHandle;
@@ -535,15 +569,20 @@ TEST_CASE("gpu-tests-create-graphics-pipeline-state")
 	GPU::Manager::ScopedDebugCapture capture(testName.c_str());
 
 	GPU::ShaderDesc shaderDesc;
-	shaderDesc.type_ = GPU::ShaderType::VS;
-	shaderDesc.dataSize_ = sizeof(g_VShader);
-	shaderDesc.data_ = g_VShader;
+	shaderDesc.dataSize_[(i32)GPU::ShaderType::VS] = sizeof(g_VShader);
+	shaderDesc.data_[(i32)GPU::ShaderType::VS] = g_VShader;
 
 	GPU::Handle shaderHandle = GPU::Manager::CreateShader(shaderDesc, testName.c_str());
 	REQUIRE(shaderHandle);
 
+	GPU::RootSignatureDesc rsDesc;
+
+	GPU::Handle rsHandle = GPU::Manager::CreateRootSignature(rsDesc, testName.c_str());
+	REQUIRE(rsHandle);
+
 	GPU::GraphicsPipelineStateDesc pipelineDesc;
-	pipelineDesc.shaders_[(i32)GPU::ShaderType::VS] = shaderHandle;
+	pipelineDesc.shader_ = shaderHandle;
+	pipelineDesc.rootSignature_ = rsHandle;
 	pipelineDesc.renderState_ = GPU::RenderState();
 	pipelineDesc.numVertexElements_ = 1;
 	pipelineDesc.vertexElements_[0].streamIdx_ = 0;
@@ -554,10 +593,12 @@ TEST_CASE("gpu-tests-create-graphics-pipeline-state")
 	pipelineDesc.topology_ = GPU::TopologyType::TRIANGLE;
 	pipelineDesc.numRTs_ = 0;
 	pipelineDesc.dsvFormat_ = GPU::Format::D24_UNORM_S8_UINT;
+
 	GPU::Handle pipelineHandle = GPU::Manager::CreateGraphicsPipelineState(pipelineDesc, testName.c_str());
 	REQUIRE(pipelineHandle);
 
 	GPU::Manager::DestroyResource(pipelineHandle);
+	GPU::Manager::DestroyResource(rsHandle);
 	GPU::Manager::DestroyResource(shaderHandle);
 }
 
@@ -765,25 +806,23 @@ TEST_CASE("gpu-tests-compile-draw")
 	GPU::Handle fbsHandle = GPU::Manager::CreateFrameBindingSet(fbDesc, testName.c_str());
 	REQUIRE(fbsHandle);
 
-	GPU::ShaderDesc vsDesc;
-	vsDesc.type_ = GPU::ShaderType::VS;
-	vsDesc.dataSize_ = sizeof(g_VShader);
-	vsDesc.data_ = g_VShader;
+	GPU::ShaderDesc shaderDesc;
+	shaderDesc.dataSize_[(i32)GPU::ShaderType::VS] = sizeof(g_VShader);
+	shaderDesc.data_[(i32)GPU::ShaderType::VS] = g_VShader;
+	shaderDesc.dataSize_[(i32)GPU::ShaderType::PS] = sizeof(g_PShader);
+	shaderDesc.data_[(i32)GPU::ShaderType::PS] = g_PShader;
 
-	GPU::Handle vsHandle = GPU::Manager::CreateShader(vsDesc, testName.c_str());
-	REQUIRE(vsHandle);
+	GPU::Handle shaderHandle = GPU::Manager::CreateShader(shaderDesc, testName.c_str());
+	REQUIRE(shaderHandle);
 
-	GPU::ShaderDesc psDesc;
-	psDesc.type_ = GPU::ShaderType::VS;
-	psDesc.dataSize_ = sizeof(g_PShader);
-	psDesc.data_ = g_PShader;
+	GPU::RootSignatureDesc rsDesc;
 
-	GPU::Handle psHandle = GPU::Manager::CreateShader(psDesc, testName.c_str());
-	REQUIRE(psHandle);
+	GPU::Handle rsHandle = GPU::Manager::CreateRootSignature(rsDesc, testName.c_str());
+	REQUIRE(rsHandle);
 
 	GPU::GraphicsPipelineStateDesc pipelineDesc;
-	pipelineDesc.shaders_[(i32)GPU::ShaderType::VS] = vsHandle;
-	pipelineDesc.shaders_[(i32)GPU::ShaderType::PS] = psHandle;
+	pipelineDesc.shader_ = shaderHandle;
+	pipelineDesc.rootSignature_ = rsHandle;
 	pipelineDesc.renderState_ = GPU::RenderState();
 	pipelineDesc.numVertexElements_ = 1;
 	pipelineDesc.vertexElements_[0].streamIdx_ = 0;
@@ -817,8 +856,8 @@ TEST_CASE("gpu-tests-compile-draw")
 
 	GPU::Manager::DestroyResource(cmdHandle);
 	GPU::Manager::DestroyResource(pipelineHandle);
-	GPU::Manager::DestroyResource(psHandle);
-	GPU::Manager::DestroyResource(vsHandle);
+	GPU::Manager::DestroyResource(rsHandle);
+	GPU::Manager::DestroyResource(shaderHandle);
 	GPU::Manager::DestroyResource(dbsHandle);
 	GPU::Manager::DestroyResource(vbHandle);
 	GPU::Manager::DestroyResource(fbsHandle);
@@ -859,15 +898,20 @@ TEST_CASE("gpu-tests-compile-dispatch")
 
 	{
 		GPU::ShaderDesc csDesc;
-		csDesc.type_ = GPU::ShaderType::CS;
-		csDesc.dataSize_ = sizeof(g_CTestBuf);
-		csDesc.data_ = g_CTestBuf;
+		csDesc.dataSize_[(i32)GPU::ShaderType::CS] = sizeof(g_CTestBuf);
+		csDesc.data_[(i32)GPU::ShaderType::CS] = g_CTestBuf;
 
 		GPU::Handle csHandle = GPU::Manager::CreateShader(csDesc, testName.c_str());
 		REQUIRE(csHandle);
 
+		GPU::RootSignatureDesc rsDesc;
+
+		GPU::Handle rsHandle = GPU::Manager::CreateRootSignature(rsDesc, testName.c_str());
+		REQUIRE(rsHandle);
+
 		GPU::ComputePipelineStateDesc pipelineDesc;
 		pipelineDesc.shader_ = csHandle;
+		pipelineDesc.rootSignature_ = rsHandle;
 		GPU::Handle pipelineHandle = GPU::Manager::CreateComputePipelineState(pipelineDesc, testName.c_str());
 		REQUIRE(pipelineHandle);
 
@@ -899,17 +943,22 @@ TEST_CASE("gpu-tests-compile-dispatch")
 		GPU::Manager::DestroyResource(cmdHandle);
 		GPU::Manager::DestroyResource(pbsHandle);
 		GPU::Manager::DestroyResource(pipelineHandle);
+		GPU::Manager::DestroyResource(rsHandle);
 		GPU::Manager::DestroyResource(csHandle);
 	}
 
 	{
 		GPU::ShaderDesc csDesc;
-		csDesc.type_ = GPU::ShaderType::CS;
-		csDesc.dataSize_ = sizeof(g_CTestTex);
-		csDesc.data_ = g_CTestTex;
+		csDesc.dataSize_[(i32)GPU::ShaderType::CS] = sizeof(g_CTestTex);
+		csDesc.data_[(i32)GPU::ShaderType::CS] = g_CTestTex;
 
 		GPU::Handle csHandle = GPU::Manager::CreateShader(csDesc, testName.c_str());
 		REQUIRE(csHandle);
+
+		GPU::RootSignatureDesc rsDesc;
+
+		GPU::Handle rsHandle = GPU::Manager::CreateRootSignature(rsDesc, testName.c_str());
+		REQUIRE(rsHandle);
 
 		GPU::ComputePipelineStateDesc pipelineDesc;
 		pipelineDesc.shader_ = csHandle;
@@ -943,6 +992,7 @@ TEST_CASE("gpu-tests-compile-dispatch")
 		GPU::Manager::DestroyResource(cmdHandle);
 		GPU::Manager::DestroyResource(pbsHandle);
 		GPU::Manager::DestroyResource(pipelineHandle);
+		GPU::Manager::DestroyResource(rsHandle);
 		GPU::Manager::DestroyResource(csHandle);
 	}
 

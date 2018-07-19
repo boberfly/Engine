@@ -236,8 +236,13 @@ namespace GPU
 
 	struct D3D12Shader
 	{
-		u8* byteCode_ = nullptr;
-		u32 byteCodeSize_ = 0;
+		u8* byteCode_[(i32)ShaderType::MAX] = {nullptr};
+		u32 byteCodeSize_[(i32)ShaderType::MAX] = {0};
+	};
+
+	struct D3D12RootSignature
+	{
+		// Implemented internally for now, stubbed
 	};
 
 	struct D3D12SubresourceRange

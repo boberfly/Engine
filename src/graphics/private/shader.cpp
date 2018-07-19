@@ -213,32 +213,21 @@ namespace Graphics
 				return false;
 			}
 
-			// Create all the shaders & sampler states.
-			GPU::Handle handle;
+			// Create all the shaders descs & sampler states.
 			if(GPU::Manager::IsInitialized())
 			{
-				impl->shaders_.reserve(impl->shaders_.size());
+				impl->shaderDescs_.reserve(impl->shaderDescs_.size());
 				i32 shaderIdx = 0;
 				for(const auto& bytecode : impl->bytecodeHeaders_)
 				{
 					GPU::ShaderDesc desc;
-					desc.data_ = &impl->bytecode_[bytecode.offset_];
-					desc.dataSize_ = bytecode.numBytes_;
-					desc.type_ = bytecode.type_;
-					handle = GPU::Manager::CreateShader(desc, "%s/shader_%d", name, shaderIdx++);
-					if(!handle)
-					{
-						OnFailure("Unable to create shader.");
-						return false;
-					}
+					desc.data_[(i32)bytecode.type_] = &impl->bytecode_[bytecode.offset_];
+					desc.dataSize_[(i32)bytecode.type_] = bytecode.numBytes_;
 
-					impl->shaders_.push_back(handle);
+					impl->shaderDescs_.push_back(desc);
 				}
 
 				impl->samplerStates_.reserve(impl->samplerStateHeaders_.size());
-
-				// Bytecode no longer needed once created.
-				impl->bytecode_.clear();
 			}
 
 			// Add binding sets to the factory.
@@ -296,6 +285,8 @@ namespace Graphics
 				// Setup technique descs, hashes, and empty pipeline states.
 				std::swap(impl->techniqueDescHashes_, shader->impl_->techniqueDescHashes_);
 				std::swap(impl->techniqueDescs_, shader->impl_->techniqueDescs_);
+				impl->shaders_.resize(impl->techniqueDescs_.size());
+				impl->rootSignatures_.resize(impl->techniqueDescs_.size());
 				impl->pipelineStates_.resize(impl->techniqueDescs_.size());
 
 				// Swap techniques over.
@@ -317,6 +308,8 @@ namespace Graphics
 				std::swap(shader->impl_, impl);
 				DBG_ASSERT(impl == nullptr);
 			}
+
+			//impl->bytecode_.clear();
 
 			return true;
 		}
@@ -867,6 +860,8 @@ namespace Graphics
 		{
 			for(auto ps : pipelineStates_)
 				GPU::Manager::DestroyResource(ps);
+			for(auto rs : rootSignatures_)
+				GPU::Manager::DestroyResource(rs);
 			for(auto s : shaders_)
 				GPU::Manager::DestroyResource(s);
 			for(auto s : samplerStates_)
@@ -909,6 +904,8 @@ namespace Graphics
 		{
 			techniqueDescHashes_.push_back(hash);
 			techniqueDescs_.push_back(desc);
+			shaders_.resize(techniqueDescs_.size());
+			rootSignatures_.resize(techniqueDescs_.size());
 			pipelineStates_.resize(techniqueDescs_.size());
 			foundIdx = techniqueDescs_.size() - 1;
 		}
@@ -968,6 +965,8 @@ namespace Graphics
 	{
 		DBG_ASSERT(impl);
 		DBG_ASSERT(impl->descIdx_ != -1);
+		DBG_ASSERT(impl->descIdx_ < shaders_.size());
+		DBG_ASSERT(impl->descIdx_ < rootSignatures_.size());
 		DBG_ASSERT(impl->descIdx_ < pipelineStates_.size());
 
 		// Find valid technique header.
@@ -989,32 +988,61 @@ namespace Graphics
 		}
 
 		// Create pipeline state for technique if there is none.
+		GPU::Handle shaderHandle = shaders_[impl->descIdx_];
+		GPU::Handle rsHandle = rootSignatures_[impl->descIdx_];
 		GPU::Handle psHandle = pipelineStates_[impl->descIdx_];
-		if(!psHandle && GPU::Manager::IsInitialized())
+		if(!psHandle && !shaderHandle && GPU::Manager::IsInitialized())
 		{
 			const auto& desc = techniqueDescs_[impl->descIdx_];
 			DBG_ASSERT(techHeader->vs_ != -1 || techHeader->cs_ != -1);
 
 			if(techHeader->cs_ != -1)
 			{
+				shaderHandle = GPU::Manager::CreateShader(shaderDescs_[techHeader->cs_], "%s/shader", name_.c_str());
+
+				// TODO: Flesh out root signatures more
+				GPU::RootSignatureDesc rsDesc;
+
+				rsHandle = GPU::Manager::CreateRootSignature(rsDesc, "%s/rootSignature", name_.c_str());
+
 				GPU::ComputePipelineStateDesc psDesc;
-				psDesc.shader_ = shaders_[techHeader->cs_];
+				psDesc.shader_ = shaderHandle;
+				psDesc.rootSignature_ = rsHandle;
 				psHandle =
 				    GPU::Manager::CreateComputePipelineState(psDesc, "%s/%s", name_.c_str(), impl->header_.name_);
 			}
 			else
 			{
+				GPU::ShaderDesc shaderDesc;
+				auto GetShaderStage = [&](i32 shaderIdx, GPU::ShaderType shaderType) {
+					if(shaderIdx != -1)
+					{
+						shaderDesc.data_[(i32)shaderType] = &shaderDescs_[shaderIdx].data_[(i32)shaderType];
+						shaderDesc.dataSize_[(i32)shaderType] = shaderDescs_[shaderIdx].dataSize_[(i32)shaderType];
+					}
+					else
+					{
+						shaderDesc.data_[(i32)shaderType] = nullptr;
+						shaderDesc.dataSize_[(i32)shaderType] = 0;
+					}
+				};
+
+				GPU::ShaderDesc shaderDesc;
+				GetShaderStage(techHeader->vs_, GPU::ShaderType::VS);
+				GetShaderStage(techHeader->hs_, GPU::ShaderType::HS);
+				GetShaderStage(techHeader->ds_, GPU::ShaderType::DS);
+				GetShaderStage(techHeader->gs_, GPU::ShaderType::GS);
+				GetShaderStage(techHeader->ps_, GPU::ShaderType::PS);
+				shaderHandle = GPU::Manager::CreateShader(shaderDesc, "%s/shader", name_.c_str());
+
+				// TODO: Flesh out root signatures more
+				GPU::RootSignatureDesc rsDesc;
+
+				rsHandle = GPU::Manager::CreateRootSignature(rsDesc, "%s/rootSignature", name_.c_str());
+
 				GPU::GraphicsPipelineStateDesc psDesc;
-				psDesc.shaders_[(i32)GPU::ShaderType::VS] =
-				    techHeader->vs_ != -1 ? shaders_[techHeader->vs_] : GPU::Handle();
-				psDesc.shaders_[(i32)GPU::ShaderType::HS] =
-				    techHeader->hs_ != -1 ? shaders_[techHeader->hs_] : GPU::Handle();
-				psDesc.shaders_[(i32)GPU::ShaderType::DS] =
-				    techHeader->ds_ != -1 ? shaders_[techHeader->ds_] : GPU::Handle();
-				psDesc.shaders_[(i32)GPU::ShaderType::GS] =
-				    techHeader->gs_ != -1 ? shaders_[techHeader->gs_] : GPU::Handle();
-				psDesc.shaders_[(i32)GPU::ShaderType::PS] =
-				    techHeader->ps_ != -1 ? shaders_[techHeader->ps_] : GPU::Handle();
+				psDesc.shader_ = shaderHandle;
+				psDesc.rootSignature_ = rsHandle;
 				psDesc.renderState_ = techHeader->rs_;
 				psDesc.numVertexElements_ = desc.numVertexElements_;
 				memcpy(&psDesc.vertexElements_[0], desc.vertexElements_.data(), sizeof(psDesc.vertexElements_));
@@ -1025,6 +1053,8 @@ namespace Graphics
 				psHandle =
 				    GPU::Manager::CreateGraphicsPipelineState(psDesc, "%s/%s", name_.c_str(), impl->header_.name_);
 			}
+			shaders_[impl->descIdx_] = shaderHandle;
+			rootSignatures_[impl->descIdx_] = rsHandle;
 			pipelineStates_[impl->descIdx_] = psHandle;
 		}
 

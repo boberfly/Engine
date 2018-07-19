@@ -108,19 +108,13 @@ namespace ImGui
 		fontHandle_ = GPU::Manager::CreateTexture(fontDesc, &texSubRscData, "ImGui/Font Texture");
 		DBG_ASSERT(fontHandle_);
 
-		GPU::ShaderDesc vsDesc;
-		vsDesc.type_ = GPU::ShaderType::VS;
-		vsDesc.data_ = g_VShader;
-		vsDesc.dataSize_ = sizeof(g_VShader);
-		vsHandle_ = GPU::Manager::CreateShader(vsDesc, "ImGui/VS");
-		DBG_ASSERT(vsHandle_);
-
-		GPU::ShaderDesc psDesc;
-		psDesc.type_ = GPU::ShaderType::PS;
-		psDesc.data_ = g_PShader;
-		psDesc.dataSize_ = sizeof(g_PShader);
-		psHandle_ = GPU::Manager::CreateShader(psDesc, "ImGui/PS");
-		DBG_ASSERT(psHandle_);
+		GPU::ShaderDesc shaderDesc;
+		shaderDesc.data_[(i32)GPU::ShaderType::VS] = g_VShader;
+		shaderDesc.dataSize_[(i32)GPU::ShaderType::VS] = sizeof(g_VShader);
+		shaderDesc.data_[(i32)GPU::ShaderType::PS] = g_PShader;
+		shaderDesc.dataSize_[(i32)GPU::ShaderType::PS] = sizeof(g_PShader);
+		shaderHandle_ = GPU::Manager::CreateShader(shaderDesc, "ImGui/VS_PS");
+		DBG_ASSERT(shaderHandle_);
 
 		auto gpsDesc = GetGPSDesc(GPU::Format::R8G8B8A8_UNORM);
 		gpsHandle_ = GPU::Manager::CreateGraphicsPipelineState(gpsDesc, "ImGui/GPS");
@@ -229,8 +223,8 @@ namespace ImGui
 		GPU::Manager::DestroyResource(pbsHandle_);
 		GPU::Manager::DestroyResource(smpHandle_);
 		GPU::Manager::DestroyResource(gpsHandle_);
-		GPU::Manager::DestroyResource(psHandle_);
-		GPU::Manager::DestroyResource(vsHandle_);
+		GPU::Manager::DestroyResource(rsHandle_);
+		GPU::Manager::DestroyResource(shaderHandle_);
 		GPU::Manager::DestroyResource(fontHandle_);
 		GPU::Manager::DestroyResource(dbsHandle_);
 		GPU::Manager::DestroyResource(ibHandle_);

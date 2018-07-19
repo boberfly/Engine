@@ -132,7 +132,7 @@ namespace Graphics
 		Core::Vector<u8> bytecode_;
 
 		Core::Vector<GPU::Handle> samplerStates_;
-		Core::Vector<GPU::Handle> shaders_;
+		Core::Vector<GPU::ShaderDesc> shaderDescs_;
 
 		// All technique impls currently active.
 		Core::Vector<ShaderTechniqueImpl*> techniques_;
@@ -140,6 +140,8 @@ namespace Graphics
 		// Data that's between different techniques.
 		Core::Vector<u64> techniqueDescHashes_;
 		Core::Vector<ShaderTechniqueDesc> techniqueDescs_;
+		Core::Vector<GPU::Handle> shaders_;
+		Core::Vector<GPU::Handle> rootSignatures_;
 		Core::Vector<GPU::Handle> pipelineStates_;
 
 		Job::RWLock rwLock_;

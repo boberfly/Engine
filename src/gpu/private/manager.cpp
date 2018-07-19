@@ -434,6 +434,16 @@ namespace GPU
 		return handle;
 	}
 
+	Handle Manager::CreateRootSignature(const RootSignatureDesc& desc, const char* debugFmt, ...)
+	{
+		DBG_ASSERT(IsInitialized());
+		rmt_ScopedCPUSample(GPU_CreateRootSignature, RMTSF_None);
+		Handle handle = impl_->AllocHandle(ResourceType::ROOT_SIGNATURE);
+		SET_DEBUG_INFO();
+		impl_->HandleErrorCode(handle, impl_->backend_->CreateRootSignature(handle, desc, fullDebugName));
+		return handle;
+	}
+
 	Handle Manager::CreateGraphicsPipelineState(const GraphicsPipelineStateDesc& desc, const char* debugFmt, ...)
 	{
 		DBG_ASSERT(IsInitialized());
@@ -503,6 +513,16 @@ namespace GPU
 		Handle handle = impl_->AllocHandle(ResourceType::FENCE);
 		SET_DEBUG_INFO();
 		impl_->HandleErrorCode(handle, impl_->backend_->CreateFence(handle, fullDebugName));
+		return handle;
+	}
+
+	Handle Manager::CreateSemaphore(const char* debugFmt, ...)
+	{
+		DBG_ASSERT(IsInitialized());
+		rmt_ScopedCPUSample(GPU_CreateSemaphore, RMTSF_None);
+		Handle handle = impl_->AllocHandle(ResourceType::SEMAPHORE);
+		SET_DEBUG_INFO();
+		impl_->HandleErrorCode(handle, impl_->backend_->CreateSemaphore(handle, fullDebugName));
 		return handle;
 	}
 

@@ -32,6 +32,7 @@ namespace GPU
 		virtual ErrorCode CreateTexture(Handle handle, const TextureDesc& desc,
 		    const TextureSubResourceData* initialData, const char* debugName) = 0;
 		virtual ErrorCode CreateShader(Handle handle, const ShaderDesc& desc, const char* debugName) = 0;
+		virtual ErrorCode CreateRootSignature(Handle handle, const RootSignatureDesc& desc, const char* debugName) = 0;
 		virtual ErrorCode CreateGraphicsPipelineState(
 		    Handle handle, const GraphicsPipelineStateDesc& desc, const char* debugName) = 0;
 		virtual ErrorCode CreateComputePipelineState(

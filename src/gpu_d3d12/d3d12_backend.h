@@ -34,6 +34,7 @@ namespace GPU
 		ErrorCode CreateTexture(Handle handle, const TextureDesc& desc, const TextureSubResourceData* initialData,
 		    const char* debugName) override;
 		ErrorCode CreateShader(Handle handle, const ShaderDesc& desc, const char* debugName) override;
+		ErrorCode CreateRootSignature(Handle handle, const RootSignatureDesc& desc, const char* debugName) override;
 		ErrorCode CreateGraphicsPipelineState(
 		    Handle handle, const GraphicsPipelineStateDesc& desc, const char* debugName) override;
 		ErrorCode CreateComputePipelineState(
@@ -103,6 +104,7 @@ namespace GPU
 		ResourcePool<D3D12Buffer> bufferResources_;
 		ResourcePool<D3D12Texture> textureResources_;
 		ResourcePool<D3D12Shader> shaders_;
+		ResourcePool<D3D12RootSignature> rootSignatures_;
 		ResourcePool<D3D12GraphicsPipelineState> graphicsPipelineStates_;
 		ResourcePool<D3D12ComputePipelineState> computePipelineStates_;
 		ResourcePool<D3D12PipelineBindingSet> pipelineBindingSets_;

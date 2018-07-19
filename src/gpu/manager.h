@@ -76,10 +76,15 @@ namespace GPU
 
 		/**
 		 * Create shader.
-		 * @param desc Shader desc, contains byte code and type.
+		 * @param desc Shader desc, contains ShaderType::MAX (6) arrays each of byte code and size.
 		 * @param debugFmt Debug name format.
 		 */
 		static Handle CreateShader(const ShaderDesc& desc, const char* debugFmt, ...);
+
+		/**
+		 * Create root signature.
+		 */
+		static Handle CreateRootSignature(const RootSignatureDesc& desc, const char* debugFmt, ...);
 
 		/**
 		 * Create graphics pipeline state.
@@ -116,6 +121,11 @@ namespace GPU
 		 * Used for synchronisation in and around queues.
 		 */
 		static Handle CreateFence(const char* debugFmt, ...);
+
+		/**
+		 * Create semaphore.
+		 */
+		static Handle CreateSemaphore(const char* debugFmt, ...);
 
 		/**
 		 * Destroy resource.
