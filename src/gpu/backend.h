@@ -45,7 +45,7 @@ namespace GPU
 		    Handle handle, const FrameBindingSetDesc& desc, const char* debugName) = 0;
 		virtual ErrorCode CreateCommandList(Handle handle, const char* debugName) = 0;
 		virtual ErrorCode CreateFence(Handle handle, const char* debugName) = 0;
-		virtual ErrorCode CreateSemaphore(Handle handle, const char* debugName) = 0;
+		//virtual ErrorCode CreateSemaphore(Handle handle, const char* debugName) = 0;
 		virtual ErrorCode DestroyResource(Handle handle) = 0;
 
 		/**

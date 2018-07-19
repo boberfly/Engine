@@ -125,7 +125,7 @@ namespace GPU
 		/**
 		 * Create semaphore.
 		 */
-		static Handle CreateSemaphore(const char* debugFmt, ...);
+		//static Handle CreateSemaphore(const char* debugFmt, ...);
 
 		/**
 		 * Destroy resource.

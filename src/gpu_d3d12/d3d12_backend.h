@@ -45,7 +45,7 @@ namespace GPU
 		ErrorCode CreateFrameBindingSet(Handle handle, const FrameBindingSetDesc& desc, const char* debugName) override;
 		ErrorCode CreateCommandList(Handle handle, const char* debugName) override;
 		ErrorCode CreateFence(Handle handle, const char* debugName) override;
-		ErrorCode CreateSemaphore(Handle handle, const char* debugName) override;
+		//ErrorCode CreateSemaphore(Handle handle, const char* debugName) override;
 		ErrorCode DestroyResource(Handle handle) override;
 
 		ErrorCode AllocTemporaryPipelineBindingSet(Handle handle, const PipelineBindingSetDesc& desc) override;

@@ -55,6 +55,7 @@ namespace GPU
 	    , bufferResources_("D3D12Buffer")
 	    , textureResources_("D3D12Texture")
 	    , shaders_("D3D12Shader")
+	    , rootSignatures_("D3D12RootSignatures")
 	    , graphicsPipelineStates_("D3D12GraphicsPipelineState")
 	    , computePipelineStates_("D3D12ComputePipelineState")
 	    , pipelineBindingSets_("D3D12PipelineBindingSet")
@@ -818,11 +819,11 @@ namespace GPU
 		return ErrorCode::UNIMPLEMENTED;
 	}
 
-	ErrorCode D3D12Backend::CreateSemaphore(Handle handle, const char* debugName)
-	{
-		//
-		return ErrorCode::UNIMPLEMENTED;
-	}
+	//ErrorCode D3D12Backend::CreateSemaphore(Handle handle, const char* debugName)
+	//{
+	//	//
+	//	return ErrorCode::UNIMPLEMENTED;
+	//}
 
 	ErrorCode D3D12Backend::DestroyResource(Handle handle)
 	{

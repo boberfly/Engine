@@ -516,6 +516,7 @@ namespace GPU
 		return handle;
 	}
 
+	/*
 	Handle Manager::CreateSemaphore(const char* debugFmt, ...)
 	{
 		DBG_ASSERT(IsInitialized());
@@ -525,6 +526,7 @@ namespace GPU
 		impl_->HandleErrorCode(handle, impl_->backend_->CreateSemaphore(handle, fullDebugName));
 		return handle;
 	}
+	*/
 
 	void Manager::DestroyResource(Handle handle)
 	{
