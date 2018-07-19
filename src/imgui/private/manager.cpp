@@ -23,8 +23,8 @@ namespace ImGui
 		GPU::Handle ibHandle_;
 		GPU::Handle dbsHandle_;
 		GPU::Handle fontHandle_;
-		GPU::Handle vsHandle_;
-		GPU::Handle psHandle_;
+		GPU::Handle shaderHandle_;
+		GPU::Handle rsHandle_;
 		GPU::Handle gpsHandle_;
 		GPU::Handle smpHandle_;
 		GPU::Handle pbsHandle_;
@@ -34,8 +34,8 @@ namespace ImGui
 		GPU::GraphicsPipelineStateDesc GetGPSDesc(GPU::Format rtvFormat)
 		{
 			GPU::GraphicsPipelineStateDesc gpsDesc;
-			gpsDesc.shaders_[(i32)GPU::ShaderType::VS] = vsHandle_;
-			gpsDesc.shaders_[(i32)GPU::ShaderType::PS] = psHandle_;
+			gpsDesc.shader_ = shaderHandle_;
+			gpsDesc.rootSignature_ = rsHandle_;
 			gpsDesc.renderState_.blendStates_[0].enable_ = true;
 			gpsDesc.renderState_.blendStates_[0].srcBlend_ = GPU::BlendType::SRC_ALPHA;
 			gpsDesc.renderState_.blendStates_[0].srcBlendAlpha_ = GPU::BlendType::SRC_ALPHA;

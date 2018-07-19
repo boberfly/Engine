@@ -217,7 +217,6 @@ namespace Graphics
 			if(GPU::Manager::IsInitialized())
 			{
 				impl->shaderDescs_.reserve(impl->shaderDescs_.size());
-				i32 shaderIdx = 0;
 				for(const auto& bytecode : impl->bytecodeHeaders_)
 				{
 					GPU::ShaderDesc desc;
@@ -1027,7 +1026,6 @@ namespace Graphics
 					}
 				};
 
-				GPU::ShaderDesc shaderDesc;
 				GetShaderStage(techHeader->vs_, GPU::ShaderType::VS);
 				GetShaderStage(techHeader->hs_, GPU::ShaderType::HS);
 				GetShaderStage(techHeader->ds_, GPU::ShaderType::DS);
