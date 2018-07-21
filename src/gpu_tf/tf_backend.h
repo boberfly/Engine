@@ -34,6 +34,7 @@ namespace GPU
 		GPU::ErrorCode CreateTexture(GPU::Handle handle, const GPU::TextureDesc& desc, const GPU::TextureSubResourceData* initialData,
 			const char* debugName) override;
 		GPU::ErrorCode CreateShader(GPU::Handle handle, const GPU::ShaderDesc& desc, const char* debugName) override;
+		GPU::ErrorCode CreateRootSignature(GPU::Handle handle, const GPU::RootSignatureDesc& desc, const char* debugName) override;
 		GPU::ErrorCode CreateGraphicsPipelineState(
 			GPU::Handle handle, const GPU::GraphicsPipelineStateDesc& desc, const char* debugName) override;
 		GPU::ErrorCode CreateComputePipelineState(
@@ -44,6 +45,7 @@ namespace GPU
 		GPU::ErrorCode CreateFrameBindingSet(GPU::Handle handle, const GPU::FrameBindingSetDesc& desc, const char* debugName) override;
 		GPU::ErrorCode CreateCommandList(GPU::Handle handle, const char* debugName) override;
 		GPU::ErrorCode CreateFence(GPU::Handle handle, const char* debugName) override;
+		GPU::ErrorCode CreateSemaphore(GPU::Handle handle, const char* debugName) override;
 		GPU::ErrorCode DestroyResource(GPU::Handle handle) override;
 
 		GPU::ErrorCode AllocTemporaryPipelineBindingSet(GPU::Handle handle, const GPU::PipelineBindingSetDesc& desc) override;
@@ -94,16 +96,19 @@ namespace GPU
 		/// The-Forge Renderer.
 		::Renderer* renderer_ = nullptr;
 
-		// Command queues.
+		/// Command queues.
 		::Queue* tfDirectQueue_;       // direct
 		::Queue* tfAsyncComputeQueue_; // compute
+
+		/// Frame semaphore.
+		::Semaphore* frameSemaphore_;
 
 		/// Resources.
 		GPU::ResourcePool<TFSwapChain> swapchainResources_;
 		GPU::ResourcePool<TFBuffer> bufferResources_;
 		GPU::ResourcePool<TFTexture> textureResources_;
 		GPU::ResourcePool<TFShader> shaders_;
-		GPU::ResourcePool<TFRootSignatures> rootSignatures_;
+		GPU::ResourcePool<TFRootSignature> rootSignatures_;
 		GPU::ResourcePool<TFGraphicsPipelineState> graphicsPipelineStates_;
 		GPU::ResourcePool<TFComputePipelineState> computePipelineStates_;
 		GPU::ResourcePool<TFPipelineBindingSet> pipelineBindingSets_;

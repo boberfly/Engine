@@ -25,7 +25,6 @@ namespace GPU
 			retVal |= BUFFER_USAGE_STORAGE_UAV;
 		if(Core::ContainsAllFlags(bindFlags, GPU::BindFlags::SHADER_RESOURCE))
 			retVal |= BUFFER_USAGE_STORAGE_SRV;
-
 		return retVal;
 	}
 
@@ -82,6 +81,7 @@ namespace GPU
 			retVal |= BUFFER_CREATION_FLAG_ESRAM;
 		if(Core::ContainsAllFlags(bindFlags, GPU::BindFlags::NO_DESCRIPTOR_VIEW_CREATION))
 			retVal |= BUFFER_CREATION_FLAG_NO_DESCRIPTOR_VIEW_CREATION;
+		return retVal;
 	}
 
 	::TextureType GetTextureType(GPU::TextureType type)
@@ -108,7 +108,6 @@ namespace GPU
 			retVal |= TEXTURE_USAGE_UNORDERED_ACCESS;
 		if(Core::ContainsAllFlags(bindFlags, GPU::BindFlags::SHADER_RESOURCE))
 			retVal |= TEXTURE_USAGE_SAMPLED_IMAGE;
-
 		return retVal;
 	}
 
@@ -341,12 +340,12 @@ namespace GPU
 	{
 		switch (format)
 		{
-			case GPU::Format::R8G8B8A8_UNORM_SRGB: return true;
-			case GPU::Format::B8G8R8A8_UNORM_SRGB: return true;
-			case GPU::Format::B8G8R8X8_UNORM_SRGB: return true;
-			case GPU::Format::BC1_UNORM_SRGB: return true;
-			case GPU::Format::BC2_UNORM_SRGB: return true;
-			case GPU::Format::BC3_UNORM_SRGB: return true;
+			case GPU::Format::R8G8B8A8_UNORM_SRGB:
+			case GPU::Format::B8G8R8A8_UNORM_SRGB:
+			case GPU::Format::B8G8R8X8_UNORM_SRGB:
+			case GPU::Format::BC1_UNORM_SRGB:
+			case GPU::Format::BC2_UNORM_SRGB:
+			case GPU::Format::BC3_UNORM_SRGB:
 			case GPU::Format::BC7_UNORM_SRGB: return true;
 			default: return false;
 		}
@@ -393,13 +392,13 @@ namespace GPU
 			bufferDesc.mIndexType = (::IndexType)desc.indexType_;
 		/// Vertex stride of the buffer (applicable to BUFFER_USAGE_VERTEX)
 		if(Core::ContainsAllFlags(desc.bindFlags_, BindFlags::VERTEX_BUFFER))
-			bufferDesc.mVertexStride = desc.vertexStride_;
+			bufferDesc.mVertexStride = (u32)desc.vertexStride_;
 		/// Index of the first element accessible by the SRV/UAV (applicable to BUFFER_USAGE_STORAGE_SRV, BUFFER_USAGE_STORAGE_UAV)
-		bufferDesc.mFirstElement = desc.firstElement_;;
+		bufferDesc.mFirstElement = (u64)desc.offset_;
 		/// Number of elements in the buffer (applicable to BUFFER_USAGE_STORAGE_SRV, BUFFER_USAGE_STORAGE_UAV)
-		bufferDesc.mElementCount = desc.elementCount_;
+		bufferDesc.mElementCount = (u64)desc.elementCount_;
 		/// Size of each element (in bytes) in the buffer (applicable to BUFFER_USAGE_STORAGE_SRV, BUFFER_USAGE_STORAGE_UAV)
-		bufferDesc.mStructStride = desc.structStride_;
+		bufferDesc.mStructStride = (u64)desc.structStride_;
 		/// Set this to specify a counter buffer for this buffer (applicable to BUFFER_USAGE_STORAGE_SRV, BUFFER_USAGE_STORAGE_UAV)
 		//bufferDesc.pCounterBuffer = ;
 		/// Format of the buffer (applicable to typed storage buffers (Buffer<T>)
@@ -547,23 +546,23 @@ namespace GPU
 	{
 		switch(filterMode)
 		{
-		case FilteringMode::NEAREST: return FilterType::FILTER_NEAREST;
-		case FilteringMode::LINEAR: return FilterType::FILTER_LINEAR;
-		case FilteringMode::NEAREST_MIPMAP_NEAREST: return FilterType::FILTER_NEAREST;
+		case FilteringMode::NEAREST: return ::FilterType::FILTER_NEAREST;
+		case FilteringMode::LINEAR: return ::FilterType::FILTER_LINEAR;
+		case FilteringMode::NEAREST_MIPMAP_NEAREST: return ::FilterType::FILTER_NEAREST;
 		case FilteringMode::LINEAR_MIPMAP_NEAREST:
 			if(anisotropy > 1)
-				return FilterType::FILTER_BILINEAR_ANISO;
+				return ::FilterType::FILTER_BILINEAR_ANISO;
 			else
-				return FilterType::FILTER_BILINEAR;
-		case FilteringMode::NEAREST_MIPMAP_LINEAR: return FilterType::FILTER_NEAREST;
+				return ::FilterType::FILTER_BILINEAR;
+		case FilteringMode::NEAREST_MIPMAP_LINEAR: return ::FilterType::FILTER_NEAREST;
 		case FilteringMode::LINEAR_MIPMAP_LINEAR:
 			if(anisotropy > 1)
-				return FilterType::FILTER_TRILINEAR_ANISO;
+				return ::FilterType::FILTER_TRILINEAR_ANISO;
 			else
-				return FilterType::FILTER_TRILINEAR;
+				return ::FilterType::FILTER_TRILINEAR;
 		default:
 			DBG_ASSERT(false);
-			return FilterType::FILTER_NEAREST;
+			return ::FilterType::FILTER_NEAREST;
 		}
 	}
 
@@ -575,13 +574,13 @@ namespace GPU
 		case FilteringMode::LINEAR:
 		case FilteringMode::NEAREST_MIPMAP_NEAREST:
 		case FilteringMode::LINEAR_MIPMAP_NEAREST:
-			return MipMapMode::MIPMAP_MODE_NEAREST;
+			return ::MipMapMode::MIPMAP_MODE_NEAREST;
 		case FilteringMode::NEAREST_MIPMAP_LINEAR:
 		case FilteringMode::LINEAR_MIPMAP_LINEAR:
-			return MipMapMode::MIPMAP_MODE_LINEAR;
+			return ::MipMapMode::MIPMAP_MODE_LINEAR;
 		default:
 			DBG_ASSERT(false);
-			return MipMapMode::MIPMAP_MODE_NEAREST;
+			return ::MipMapMode::MIPMAP_MODE_NEAREST;
 		}
 	}
 

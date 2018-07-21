@@ -69,6 +69,7 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 	    , bufferResources_("TFBuffer")
 	    , textureResources_("TFTexture")
 	    , shaders_("TFShader")
+		, rootSignatures_("TFRootSignature")
 	    , graphicsPipelineStates_("TFGraphicsPipelineState")
 	    , computePipelineStates_("TFComputePipelineState")
 	    , pipelineBindingSets_("TFPipelineBindingSet")
@@ -84,7 +85,31 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 
 	GPU::TFBackend::~TFBackend()
 	{
+		NextFrame();
+
+		//::CloseHandle(frameFenceEvent_);
+		//::CloseHandle(uploadFenceEvent_);
+
+		// remove frame fence
+		::removeFence(renderer_, frameFence_);
+
+		// remove command signatures
+		::removeIndirectCommandSignature(renderer_, tfDrawCmdSig_);
+		::removeIndirectCommandSignature(renderer_, tfDrawIndexedCmdSig_);
+		::removeIndirectCommandSignature(renderer_, tfDispatchCmdSig_);
+
+		// remove static samplers
+		for(i32 idx = 0; idx != tfStaticSamplers_.size(); ++idx)
+			::removeSampler(renderer_, tfStaticSamplers_[idx]);
+
+		// remove direct & compute queues
+		::removeQueue(renderer_, tfDirectQueue_);
+		::removeQueue(renderer_, tfAsyncComputeQueue_);
+
+		// remove The-Forge resource loader
 		::removeResourceLoaderInterface(renderer_);
+
+		// remove The-Forge renderer
 		::removeRenderer(renderer_);
 		delete renderer_;
 	}
@@ -151,11 +176,21 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 			renderer_ = nullptr;
 			return ErrorCode::FAIL;
 		}
-		// Resource loader so that we can create buffers/textures/shaders
+
+		// create static samplers.
+		CreateStaticSamplers();
+
+		// device created, setup command queues.
+		CreateCommandQueues();
+
+		// setup command signatures.
+		CreateCommandSignatures();
+
+		// resource loader so that we can create buffers/textures/shaders.
 		::initResourceLoaderInterface(renderer_, DEFAULT_MEMORY_BUDGET, false);
 
-		// Create static samplers
-		CreateStaticSamplers();
+		// frame fence.
+		::addFence(renderer_, &frameFence_);
 
 		return ErrorCode::OK;
 	}
@@ -175,12 +210,12 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 #else
 #error "Platform not supported."
 #endif
-		auto swapChainResource = swapchainResources_.Write(handle);
+		auto swapChain = swapchainResources_.Write(handle);
 
 		::SwapChainDesc swapChainDesc = {};
 		swapChainDesc.pWindow = &windowsDesc;
 		swapChainDesc.mPresentQueueCount = 1;
-		swapChainDesc.ppPresentQueues = &pGraphicsQueue[0];
+		swapChainDesc.ppPresentQueues = &tfDirectQueue_;
 		swapChainDesc.mWidth = desc.width_;
 		swapChainDesc.mHeight = desc.height_;
 		swapChainDesc.mImageCount = desc.bufferCount_;
@@ -188,10 +223,8 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		swapChainDesc.mColorFormat = GetImageFormat(desc.format_);
 		swapChainDesc.mEnableVsync = false;
 
-		TFSwapChain& swapChainRes = *swapChainResource;
-		::SwapChain* swapChain;
-		::addSwapChain(renderer_, &swapChainDesc, &swapChain);
-		if(!swapChain)
+		::addSwapChain(renderer_, &swapChainDesc, &swapChain->swapChain_);
+		if(!swapChain->swapChain)
 			return ErrorCode::FAIL;
 
 		swapChainRes.swapChain_ = swapChain;
@@ -214,6 +247,13 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		if(!buffer->buffer_)
 			return ErrorCode::FAIL;
 
+		if(initialData)
+		{
+			::BufferUpdateDesc desc = ::BufferUpdateDesc(buffer->buffer_, 
+				initialData, 0, 0, desc.size_);
+			::updateResource(&desc, false);
+		}
+
 		return ErrorCode::OK;
 	}
 
@@ -231,7 +271,8 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 			if(!texture->renderTarget_)
 				return ErrorCode::FAIL;
 
-			texture->texture_ = &(*Texture)texture->renderTarget_->pTexture;
+			// For compatibility
+			texture->texture_ = &texture->renderTarget_->pTexture;
 		}
 		else
 		{
@@ -245,15 +286,93 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 				return ErrorCode::FAIL;
 		}
 
+		if(initialData)
+		{
+			::Image image = Image();
+			::TextureDesc texDesc = texture->texture_.mDesc;
+			image.RedefineDimensions(texDesc.mFormat, texDesc.mWidth, texDesc.mHeight, 
+			    texDesc.mDepth, texDesc.mMipLevels, texDesc.mArraySize);
+			image.SetPixels(initialData);
+
+			::TextureUpdateDesc uploadDesc = {0};
+			uploadDesc.pTexture = texture->texture_;
+			uploadDesc.pImage = &image;
+			::updateResource(&uploadDesc, false);
+		}
+
 		return ErrorCode::OK;
 	}
 
 	GPU::ErrorCode GPU::TFBackend::CreateShader(Handle handle, const ShaderDesc& desc, const char* debugName)
 	{
 		auto shader = shaders_.Write(handle);
-		shader->byteCode_ = new u8[desc.dataSize_];
-		shader->byteCodeSize_ = desc.dataSize_;
-		memcpy(shader->byteCode_, desc.data_, desc.dataSize_);
+
+		auto GetShader = [&](ShaderType shaderType) {
+			::BinaryShaderStageDesc bssDesc = {};
+			bssDesc.mByteCodeSize = 0;
+			bssDesc.pByteCode = nullptr;
+			if(desc.dataSize_[(i32)shaderType] > 0)
+			{
+				shaderStage |= SHADER_STAGE_FRAG;
+				bssDesc.mByteCodeSize = desc.dataSize_[(i32)shaderType];
+				bssDesc.pByteCode = (char*)desc.data_[(i32)shaderType];
+			}
+			return bssDesc;
+		};
+
+		if(desc.shaders_[ShaderType::CS].dataSize_ > 0)
+		{
+			::BinaryShaderDesc bsDesc = {0};
+			bsDesc.mStages = SHADER_STAGE_COMP;
+			bsDesc.mComp = GetShader(ShaderType::CS);
+			::addShaderBinary(renderer_, &bsDesc, &shader->shader_);
+
+			if(!shader->shader_)
+				return ErrorCode::FAIL;
+
+			return ErrorCode::OK;
+		}
+		else if(desc.shaders_[ShaderType::VS].dataSize_ > 0)
+		{
+			::ShaderStage shaderStage = SHADER_STAGE_VERT;
+			::BinaryShaderDesc bsDesc = {0};
+			bsDesc.mStages = shaderStage;
+			bsDesc.mVert = GetShader(ShaderType::VS);
+			bsDesc.mFrag = GetShader(ShaderType::PS);
+			bsDesc.mGeom = GetShader(ShaderType::GS);
+			bsDesc.mHull = GetShader(ShaderType::HS);
+			bsDesc.mDomain = GetShader(ShaderType::DS);
+			::addShaderBinary(renderer_, &bsDesc, &shader->shader_);
+
+			if(!shader->shader_)
+				return ErrorCode::FAIL;
+
+			return ErrorCode::OK;
+		}
+
+		return ErrorCode::FAIL;
+	}
+
+	GPU::ErrorCode GPU::TFBackend::CreateRootSignature(Handle handle, const RootSignatureDesc& desc, const char* debugName)
+	{
+		auto rootSignature = rootSignatures_.Write(handle);
+
+		::RootSignatureDesc rsDesc = {0};
+		Core::Array<::Shader*, desc.shaders_.size()> shaders = {};
+		for(i32 = 0; i < desc.shaders_.size(); ++i)
+		{
+			auto shader = shaders_.Read(desc.shaders_[i]);
+			shaders[i] = &shader->shader_;
+		}
+		rsDesc.ppShaders = shaders.data();
+		rsDesc.mShaderCount = desc.shaders_.size();
+		rsDesc.ppStaticSamplerNames = &GetDefaultSamplerNames;
+		rsDesc.ppStaticSamplers = tfStaticSamplers_.data();
+		rsDesc.mStaticSamplerCount = tfStaticSamplers_.size();
+		::addRootSignature(renderer_, &rsDesc, rootSignature->rootSignature_);
+
+		if(!rootSignature->rootSignature_)
+			return ErrorCode::FAIL;
 
 		return ErrorCode::OK;
 	}
@@ -263,45 +382,6 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 	{
 		auto gps = graphicsPipelineStates_.Write(handle);
 		::GraphicsPipelineDesc gpDesc = {};
-
-		auto GetBinaryShaderDesc = [&](GraphicsPipelineStateDesc desc) {
-			auto GetShaderStages = [&]() {
-				::ShaderStage shaderStage = SHADER_STAGE_NONE;
-				if(desc.shaders_[(i32)ShaderType::VS])
-					shaderStage |= SHADER_STAGE_VERT;
-				if(desc.shaders_[(i32)ShaderType::PS])
-					shaderStage |= SHADER_STAGE_FRAG;
-				if(desc.shaders_[(i32)ShaderType::GS])
-					shaderStage |= SHADER_STAGE_GEOM;
-				if(desc.shaders_[(i32)ShaderType::HS])
-					shaderStage |= SHADER_STAGE_HULL;
-				if(desc.shaders_[(i32)ShaderType::DS])
-					shaderStage |= SHADER_STAGE_DOMN;
-				return shaderStage;
-			};
-
-			auto GetShaderBytecode = [&](ShaderType shaderType) {
-				::BinaryShaderStageDesc bssDesc = {};
-				auto shaderHandle = desc.shaders_[(i32)shaderType];
-				if(shaderHandle)
-				{
-					auto shader = shaders_.Read(shaderHandle);
-					bssDesc.pByteCode = (char*)shader->byteCode_;
-					bssDesc.mByteCodeSize = shader->byteCodeSize_;
-				}
-				return bssDesc;
-			};
-
-			::BinaryShaderDesc bsDesc = {};
-			bsDesc.mStages = GetShaderStages();
-			bsDesc.mVert = GetShaderBytecode(ShaderType::VS);
-			bsDesc.mFrag = GetShaderBytecode(ShaderType::PS);
-			bsDesc.mGeom = GetShaderBytecode(ShaderType::GS);
-			bsDesc.mHull = GetShaderBytecode(ShaderType::HS);
-			bsDesc.mDomain = GetShaderBytecode(ShaderType::DS);
-
-			return bsDesc;
-		};
 
 		auto GetBlendState = [](RenderState renderState) {
 			auto GetBlend = [](BlendType type) {
@@ -557,20 +637,10 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 			}
 		};
 
-		// Add shader
-		::BinaryShaderDesc bsDesc = GetBinaryShaderDesc(desc);
-		::addShaderBinary(renderer_, &bsDesc, &gps->shader_);
-
-		// Add root signature
-		::RootSignatureDesc rsDesc = {};
-		rsDesc.ppShaders = gps->shader_;
-		rsDesc.mShaderCount = 1;
-		rsDesc.ppStaticSamplers = &tfStaticSamplers_[0];
-		rsDesc.mStaticSamplerCount = tfStaticSamplers_.size();
-
-		//uint32_t			mMaxBindlessDescriptors[DESCRIPTOR_TYPE_COUNT];
-		//const char**		ppStaticSamplerNames;
-		::addRootSignature(renderer_, &rsDesc, &gps->rootSignature_);
+		// Get the shader.
+		auto shader = shaders_.Read(desc.shader_);
+		// Get the root signature.
+		auto rootSignature = rootSignatures_.Read(desc.rootSignature_);
 
 		// Add vertex layout
 		::VertexLayout vertexLayout = {};
@@ -600,8 +670,9 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		::RasterizerStateDesc rasterStateDesc = GetRasterizerState(desc.renderState_);
 		::addRasterizerState(renderer_, &rasterStateDesc, &gps->rasterizerState_);
 
-		gpDesc.pShaderProgram = gps->shader_;
-		gpDesc.pRootSignature = gps->rootSignature_;
+		//gpDesc.pShaderProgram = gps->shader_;
+		gpDesc.pShaderProgram = shader->shader_;
+		gpDesc.pRootSignature = rootSignature->rootSignature_;
 		gpDesc.pVertexLayout = &vertexLayout;
 		gpDesc.pBlendState = gps->blendState_;
 		gpDesc.pDepthState = gps->depthState_;
@@ -640,17 +711,9 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 
 		auto shader = shaders_.Read(desc.shader_);
 
-		// Add shader
-		::BinaryShaderStageDesc bssDesc = {};
-		bssDesc.mByteCodeSize = shader->byteCodeSize_;
-		bssDesc.pByteCode = (char*)shader->byteCode_;
-		::addShaderBinary(renderer_, &bssDesc, &cps->shader_);
-		if(!cps->shader_)
-			return ErrorCode::FAIL;
-
 		// Add root signature
 		::RootSignatureDesc rsDesc = {};
-		rsDesc.ppShaders = cps->shader_;
+		rsDesc.ppShaders = shader->shader_;
 		rsDesc.mShaderCount = 1;
 		::addRootSignature(renderer_, &rsDesc, &cps->rootSignature_);
 		if(!cps->rootSignature_)
@@ -658,7 +721,7 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 
 		// Add pipeline
 		::ComputePipelineDesc cpDesc = {};
-		cpDesc.pShaderProgram = cps->shader_;
+		cpDesc.pShaderProgram = shader->shader_;
 		cpDesc.pRootSignature = cps->rootSignature_;
 		::addComputePipeline(renderer_, &cpDesc, &cps->pipeline_);
 		if(!cps->pipeline_)
@@ -674,11 +737,13 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 	{
 		auto pbs = pipelineBindingSets_.Write(handle);
 
-		outPipelineBindingSet.cbvTransitions_.resize(desc.numCBVs_);
-		outPipelineBindingSet.srvTransitions_.resize(desc.numSRVs_);
-		outPipelineBindingSet.uavTransitions_.resize(desc.numUAVs_);
+		pbs.cbvs_.resize(desc.numCBVs_);
+		pbs.srvs_.resize(desc.numSRVs_);
+		pbs.uavs_.resize(desc.numUAVs_);
+		pbs.samplerBinds_.resize(desc.numSamplers_);
+		pbs.samplers_.resize(desc.numSamplers_);
 
-		outPipelineBindingSet.shaderVisible_ = desc.shaderVisible_;
+		pbs.shaderVisible_ = desc.shaderVisible_;
 
 		return ErrorCode::OK;
 	}
@@ -699,7 +764,7 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 				DBG_ASSERT(buffer);
 
 				DBG_ASSERT(Core::ContainsAllFlags(buffer->supportedStates_, RESOURCE_STATE_INDEX_BUFFER));
-				dbs->ibResource_ = &(*buffer);
+				dbs->iBuffer_ = &buffer->buffer_;
 			}
 
 			i32 idx = 0;
@@ -711,7 +776,7 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 					DBG_ASSERT(buffer);
 					DBG_ASSERT(Core::ContainsAllFlags(
 					    buffer->supportedStates_, RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER));
-					dbs->vbResources_[idx] = &(*buffer);
+					dbs->vBuffers_[idx] = &buffer->buffer_;
 				}
 				++idx;
 			}
@@ -836,8 +901,25 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 	{
 		auto commandList = commandLists_.Write(handle);
 
-		*commandList = new TFCommandList(*device_, 0x0, D3D12_COMMAND_LIST_TYPE_DIRECT, debugName);
+		::CmdPoolDesc cmdPoolDesc;
+		cmdPoolDesc.mCmdPoolType = CMD_POOL_DIRECT;
+		::addCmdPool(renderer_, tfDirectQueue_, false, commandList->cmdPool_);
+		if(!commandList->cmdPool_)
+			return ErrorCode::FAIL;
 
+		::addCmd_n(cmdPool_, false, MAX_GPU_FRAMES, commandList->cmd_);
+		if(!commandList->cmd_)
+			return ErrorCode::FAIL;
+/*
+		for (uint32_t i = 0; i < MAX_GPU_FRAMES; ++i)
+		{
+			addFence(renderer_, &pRenderCompleteFences[i]);
+			addFence(renderer_, &pComputeCompleteFences[i]);
+			addSemaphore(renderer_, &pRenderCompleteSemaphores[i]);
+			addSemaphore(renderer_, &pComputeCompleteSemaphores[i]);
+		}
+		addSemaphore(renderer_, &pImageAcquiredSemaphore);
+*/
 		return ErrorCode::OK;
 	}
 
@@ -872,55 +954,70 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		case ResourceType::SWAP_CHAIN:
 			if(auto swapChain = swapchainResources_.Write(handle))
 			{
-				removeSwapChain(renderer_, swapChain->swapChain_);
+				::removeSwapChain(renderer_, swapChain->swapChain_);
 				*swapChain = TFSwapChain();
 			}
 			break;
 		case ResourceType::BUFFER:
 			if(auto buffer = bufferResources_.Write(handle))
 			{
-				removeResource(renderer_, buffer->buffer_);
+				::removeResource(renderer_, buffer->buffer_);
 				*buffer = TFBuffer();
 			}
 			break;
 		case ResourceType::TEXTURE:
 			if(auto texture = bufferResources_.Write(handle))
 			{
-				removeResource(renderer_, texture->texture_);
-				removeResource(renderer_, texture->renderTarget_);
+				::removeResource(renderer_, texture->texture_);
+				::removeResource(renderer_, texture->renderTarget_);
 				*texture = TFTexture();
 			}
 			break;
 		case ResourceType::SHADER:
 			if(auto shader = shaders_.Write(handle))
 			{
-				delete[] shader->byteCode_;
+				::removeShader(renderer_, shader->shader_);
 				*shader = TFShader();
+			}
+			break;
+		case ResourceType::ROOT_SIGNATURE:
+			if(auto rs = rootSignatures_.Write(handle))
+			{
+				::removeRootSignature(renderer_, rs->rootSignature_);
+				*rs = TFRootSignature();
 			}
 			break;
 		case ResourceType::GRAPHICS_PIPELINE_STATE:
 			if(auto gps = graphicsPipelineStates_.Write(handle))
 			{
-				removePipeline(renderer_, gps->pipeline_);
-				removeRootSignature(renderer_, gps->rootSignature_);
-				removeShader(renderer_, gps->shader_);
-				removeBlendState(renderer_, gps->blendState_);
-				removeDepthState(renderer_, gps->depthState_);
-				removeRasterizerState(renderer_, gps->rasterizerState_);
+				::removePipeline(renderer_, gps->pipeline_);
+				::removeBlendState(renderer_, gps->blendState_);
+				::removeDepthState(renderer_, gps->depthState_);
+				::removeRasterizerState(renderer_, gps->rasterizerState_);
 				*gps = TFGraphicsPipelineState();
 			}
 			break;
 		case ResourceType::COMPUTE_PIPELINE_STATE:
 			if(auto cps = computePipelineStates_.Write(handle))
 			{
-				removePipeline(renderer_, cps->pipeline_);
-				removeRootSignature(renderer_, cps->rootSignature_);
-				removeShader(renderer_, cps->shader_);
+				::removePipeline(renderer_, cps->pipeline_);
+				::removeRootSignature(renderer_, cps->rootSignature_);
+				::removeShader(renderer_, cps->shader_);
 				*cps = TFComputePipelineState();
 			}
 			break;
 		case ResourceType::PIPELINE_BINDING_SET:
-			*pipelineBindingSets_.Write(handle) = TFPipelineBindingSet();
+			//*pipelineBindingSets_.Write(handle) = TFPipelineBindingSet();
+			if(auto pbs = pipelineBindingSets_.Write(handle))
+			{
+				pbs_->cbvs_.clear();
+				pbs_->srvs_.clear();
+				pbs_->uavs_.clear();
+				pbs_->samplerBinds_.clear();
+				for(u32 i = 0; i < pbs->samplers_.size(); ++i)
+					::removeSampler(renderer_, pbs->samplers_[i]);
+				*pbs = TFPipelineBindingSet();
+			}
 			break;
 		case ResourceType::DRAW_BINDING_SET:
 			*drawBindingSets_.Write(handle) = TFDrawBindingSet();
@@ -931,21 +1028,22 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		case ResourceType::COMMAND_LIST:
 			if(auto commandList = commandLists_.Write(handle))
 			{
-				delete *commandList;
-				*commandList = nullptr;
+				::removeCmd_n(commandList->cmdPool_, MAX_GPU_FRAMES, commandList->cmd_);
+				::removeCmdPool(renderer_, commandList->cmdPool_);
+				*commandList = TFCmd();
 			}
 			break;
 		case ResourceType::FENCE:
 			if(auto fence = fences_.Write(handle))
 			{
-				removeFence(renderer_, fence->fence_);
+				::removeFence(renderer_, fence->fence_);
 				*fence = TFFence();
 			}
 			break;
 		case ResourceType::SEMAPHORE:
 			if(auto semaphore = semaphores_.Write(handle))
 			{
-				removeSemaphore(renderer_, semaphore->semaphore_);
+				::removeSemaphore(renderer_, semaphore->semaphore_);
 				*semaphore = TFSemaphore();
 			}
 			break;
@@ -959,7 +1057,7 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 	GPU::ErrorCode GPU::TFBackend::AllocTemporaryPipelineBindingSet(Handle handle, const PipelineBindingSetDesc& desc)
 	{
 		auto pbs = pipelineBindingSets_.Write(handle);
-
+		/*
 		// Setup descriptors.
 		auto& samplerAllocator = device_->GetSamplerDescriptorAllocator();
 		auto& cbvSubAllocator = device_->GetCBVSubAllocator();
@@ -970,18 +1068,14 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		pbs->cbvs_ = cbvSubAllocator.Alloc(desc.numCBVs_, MAX_CBV_BINDINGS);
 		pbs->srvs_ = srvSubAllocator.Alloc(desc.numSRVs_, MAX_SRV_BINDINGS);
 		pbs->uavs_ = uavSubAllocator.Alloc(desc.numUAVs_, MAX_UAV_BINDINGS);
-
+		*/
 		pbs->temporary_ = true;
 		pbs->shaderVisible_ = true;
 
-		DBG_ASSERT(pbs->samplers_.size_ >= desc.numSamplers_);
-		DBG_ASSERT(pbs->cbvs_.size_ >= desc.numCBVs_);
-		DBG_ASSERT(pbs->srvs_.size_ >= desc.numSRVs_);
-		DBG_ASSERT(pbs->uavs_.size_ >= desc.numUAVs_);
-
-		pbs->cbvTransitions_.resize(desc.numCBVs_);
-		pbs->srvTransitions_.resize(desc.numSRVs_);
-		pbs->uavTransitions_.resize(desc.numUAVs_);
+		pbs->cbv_.resize(desc.numCBVs_);
+		pbs->srv_.resize(desc.numSRVs_);
+		pbs->uav_.resize(desc.numUAVs_);
+		pbs->samplers_.resize(desc.numSamplers_);
 
 		return ErrorCode::OK;
 	}
@@ -990,8 +1084,6 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 	{
 		auto pbs = pipelineBindingSets_.Write(handle);
 
-		Core::Array<D3D12_CONSTANT_BUFFER_VIEW_DESC, MAX_CBV_BINDINGS> cbvDescs = {};
-
 		i32 bindingIdx = base;
 		for(i32 i = 0; i < descs.size(); ++i, ++bindingIdx)
 		{
@@ -999,31 +1091,21 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 			DBG_ASSERT(cbvHandle.IsValid());
 			DBG_ASSERT(cbvHandle.GetType() == ResourceType::BUFFER);
 
-			auto resource = GetD3D12Resource(cbvHandle);
+			auto resource = GetTFResource(cbvHandle);
 			DBG_ASSERT(resource);
 
-			// Setup transition info.
-			pbs->cbvTransitions_[bindingIdx].resource_ = &(*resource);
-			pbs->cbvTransitions_[bindingIdx].firstSubRsc_ = 0;
-			pbs->cbvTransitions_[bindingIdx].numSubRsc_ = 1;
-
-			// Setup the D3D12 descriptor.
-			const auto& cbv = descs[i];
-			auto& cbvDesc = cbvDescs[bindingIdx];
-			auto buf = bufferResources_.Read(cbvHandle);
-			cbvDesc.BufferLocation = buf->resource_->GetGPUVirtualAddress() + cbv.offset_;
-			cbvDesc.SizeInBytes = Core::PotRoundUp(cbv.size_, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT);
+			pbs->cbvs_[bindingIdx].pName = "%i", bindingIdx;
+			pbs->cbvs_[bindingIdx].pOffsets = 0;
+			pbs->cbvs_[bindingIdx].ppBuffers = {&(*resource->resource_)};
+			pbs->cbvs_[bindingIdx].mCount = 1;
 		}
 
-		return device_->UpdateCBVs(
-		    *pbs, base, descs.size(), pbs->cbvTransitions_.data() + base, cbvDescs.data() + base);
+		return ErrorCode::OK;
 	}
 
 	GPU::ErrorCode GPU::TFBackend::UpdatePipelineBindings(Handle handle, i32 base, Core::ArrayView<const BindingSRV> descs)
 	{
 		auto pbs = pipelineBindingSets_.Write(handle);
-
-		Core::Array<D3D12_SHADER_RESOURCE_VIEW_DESC, MAX_SRV_BINDINGS> srvDescs = {};
 
 		i32 bindingIdx = base;
 		for(i32 i = 0; i < descs.size(); ++i, ++bindingIdx)
@@ -1032,8 +1114,8 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 			DBG_ASSERT(srvHandle.IsValid());
 			DBG_ASSERT(srvHandle.GetType() == ResourceType::BUFFER || srvHandle.GetType() == ResourceType::TEXTURE);
 
-			ResourceRead<D3D12Buffer> buffer;
-			ResourceRead<D3D12Texture> texture;
+			ResourceRead<TFBuffer> buffer;
+			ResourceRead<TFTexture> texture;
 			if(srvHandle.GetType() == ResourceType::BUFFER)
 				buffer = bufferResources_.Read(srvHandle);
 			else
@@ -1052,83 +1134,43 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 				DBG_ASSERT(mipLevels > 0);
 			}
 
-			auto& srvDesc = srvDescs[bindingIdx];
-
-			srvDesc.Format = GetFormat(srv.format_);
-			srvDesc.ViewDimension = GetSRVDimension(srv.dimension_);
-			srvDesc.Shader4ComponentMapping =
-			    D3D12_ENCODE_SHADER_4_COMPONENT_MAPPING(D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_0,
-			        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_1,
-			        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_2,
-			        D3D12_SHADER_COMPONENT_MAPPING_FROM_MEMORY_COMPONENT_3);
+			::TextureUsage texUsage = TEXTURE_USAGE_UNDEFINED | TEXTURE_USAGE_SAMPLED_IMAGE;
 			switch(srv.dimension_)
 			{
 			case ViewDimension::BUFFER:
-				srvDesc.Buffer.FirstElement = srv.mostDetailedMip_FirstElement_;
-				srvDesc.Buffer.NumElements = mipLevels;
-				srvDesc.Buffer.StructureByteStride = srv.structureByteStride_;
-				if(srv.structureByteStride_ == 0)
-					srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
-				else
-					srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
 				firstSubRsc = 0;
 				numSubRsc = 1;
 				break;
 			case ViewDimension::TEX1D:
-				srvDesc.Texture1D.MostDetailedMip = srv.mostDetailedMip_FirstElement_;
-				srvDesc.Texture1D.MipLevels = mipLevels;
-				srvDesc.Texture1D.ResourceMinLODClamp = srv.resourceMinLODClamp_;
-				firstSubRsc = srv.mostDetailedMip_FirstElement_;
+				//firstSubRsc = srv.mostDetailedMip_FirstElement_;
 				numSubRsc = mipLevels;
 				break;
 			case ViewDimension::TEX1D_ARRAY:
-				srvDesc.Texture1DArray.MostDetailedMip = srv.mostDetailedMip_FirstElement_;
-				srvDesc.Texture1DArray.MipLevels = mipLevels;
-				srvDesc.Texture1DArray.ArraySize = srv.arraySize_;
-				srvDesc.Texture1DArray.FirstArraySlice = srv.firstArraySlice_;
-				srvDesc.Texture1DArray.ResourceMinLODClamp = srv.resourceMinLODClamp_;
-				firstSubRsc = srv.mostDetailedMip_FirstElement_ + (srv.firstArraySlice_ * texture->desc_.levels_);
+				texUsage |= TEXTURE_USAGE_2D_ARRAY_VIEW
+				//firstSubRsc = srv.mostDetailedMip_FirstElement_ + (srv.firstArraySlice_ * texture->desc_.levels_);
 				numSubRsc = mipLevels;
 				break;
 			case ViewDimension::TEX2D:
-				srvDesc.Texture2D.MostDetailedMip = srv.mostDetailedMip_FirstElement_;
-				srvDesc.Texture2D.MipLevels = mipLevels;
-				srvDesc.Texture2D.PlaneSlice = srv.planeSlice_;
-				srvDesc.Texture2D.ResourceMinLODClamp = srv.resourceMinLODClamp_;
-				firstSubRsc = srv.mostDetailedMip_FirstElement_;
+				//firstSubRsc = srv.mostDetailedMip_FirstElement_;
 				numSubRsc = mipLevels;
 				break;
 			case ViewDimension::TEX2D_ARRAY:
-				srvDesc.Texture2DArray.MostDetailedMip = srv.mostDetailedMip_FirstElement_;
-				srvDesc.Texture2DArray.MipLevels = mipLevels;
-				srvDesc.Texture2DArray.ArraySize = srv.arraySize_;
-				srvDesc.Texture2DArray.FirstArraySlice = srv.firstArraySlice_;
-				srvDesc.Texture2DArray.PlaneSlice = srv.planeSlice_;
-				srvDesc.Texture2DArray.ResourceMinLODClamp = srv.resourceMinLODClamp_;
-				firstSubRsc = srv.mostDetailedMip_FirstElement_ + (srv.firstArraySlice_ * texture->desc_.levels_);
+				texUsage |= TEXTURE_USAGE_2D_ARRAY_VIEW
+				//firstSubRsc = srv.mostDetailedMip_FirstElement_ + (srv.firstArraySlice_ * texture->desc_.levels_);
 				numSubRsc = mipLevels;
 				break;
 			case ViewDimension::TEX3D:
-				srvDesc.Texture3D.MostDetailedMip = srv.mostDetailedMip_FirstElement_;
-				srvDesc.Texture3D.MipLevels = mipLevels;
-				srvDesc.Texture3D.ResourceMinLODClamp = srv.resourceMinLODClamp_;
-				firstSubRsc = srv.mostDetailedMip_FirstElement_;
+				//firstSubRsc = srv.mostDetailedMip_FirstElement_;
 				numSubRsc = mipLevels;
 				break;
 			case ViewDimension::TEXCUBE:
-				srvDesc.TextureCube.MostDetailedMip = srv.mostDetailedMip_FirstElement_;
-				srvDesc.TextureCube.MipLevels = mipLevels;
-				srvDesc.TextureCube.ResourceMinLODClamp = srv.resourceMinLODClamp_;
-				firstSubRsc = 0;
+				texUsage |= TEXTURE_USAGE_CUBEMAP_VIEW
+				//firstSubRsc = 0;
 				numSubRsc = texture->desc_.levels_ * 6;
 				break;
 			case ViewDimension::TEXCUBE_ARRAY:
-				srvDesc.TextureCubeArray.MostDetailedMip = srv.mostDetailedMip_FirstElement_;
-				srvDesc.TextureCubeArray.MipLevels = mipLevels;
-				srvDesc.TextureCubeArray.NumCubes = srv.arraySize_;
-				srvDesc.TextureCubeArray.First2DArrayFace = srv.firstArraySlice_;
-				srvDesc.TextureCubeArray.ResourceMinLODClamp = srv.resourceMinLODClamp_;
-				firstSubRsc = srv.firstArraySlice_ * 6;
+				texUsage |= TEXTURE_USAGE_CUBEMAP_ARRAY_VIEW
+				//firstSubRsc = srv.firstArraySlice_ * 6;
 				numSubRsc = (texture->desc_.levels_ * 6) * srv.arraySize_;
 				break;
 			default:
@@ -1137,22 +1179,28 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 				break;
 			}
 
-			auto resource = GetD3D12Resource(srvHandle);
+			auto resource = GetTFResource(srvHandle);
 			DBG_ASSERT(resource);
-			pbs->srvTransitions_[bindingIdx].resource_ = &(*resource);
-			pbs->srvTransitions_[bindingIdx].firstSubRsc_ = firstSubRsc;
-			pbs->srvTransitions_[bindingIdx].numSubRsc_ = numSubRsc;
+			pbs->srvs_[bindingIdx].pName = "%i", bindingIdx;
+			if(texture)
+			{
+				pbs->srvs_[bindingIdx].mTextureUsage = texUsage;
+				pbs->srvs_[bindingIdx].ppTextures = {&(*resource->resource_)};
+			}
+			else //buffer
+			{
+				pbs->srvs_[bindingIdx].pOffsets = firstSubRsc;
+				pbs->srvs_[bindingIdx].ppBuffers = {&(*resource->resource_)};
+			}
+			pbs->srvs_[bindingIdx].mCount = numSubRsc;
 		}
 
-		return device_->UpdateSRVs(
-		    *pbs, base, descs.size(), pbs->srvTransitions_.data() + base, srvDescs.data() + base);
+		return ErrorCode::OK;
 	}
 
 	GPU::ErrorCode GPU::TFBackend::UpdatePipelineBindings(Handle handle, i32 base, Core::ArrayView<const BindingUAV> descs)
 	{
 		auto pbs = pipelineBindingSets_.Write(handle);
-
-		Core::Array<D3D12_UNORDERED_ACCESS_VIEW_DESC, MAX_UAV_BINDINGS> uavDescs = {};
 
 		i32 bindingIdx = base;
 		for(i32 i = 0; i < descs.size(); ++i, ++bindingIdx)
@@ -1174,54 +1222,29 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 			i32 numSubRsc = 0;
 
 			auto& uavDesc = uavDescs[bindingIdx];
-			uavDesc.Format = GetFormat(uav.format_);
-			uavDesc.ViewDimension = GetUAVDimension(uav.dimension_);
+
+			::TextureUsage texUsage = TEXTURE_USAGE_UNDEFINED | TEXTURE_USAGE_UNORDERED_ACCESS;
 			switch(uav.dimension_)
 			{
 			case ViewDimension::BUFFER:
-				uavDesc.Buffer.FirstElement = uav.mipSlice_FirstElement_;
-				uavDesc.Buffer.NumElements = uav.firstArraySlice_FirstWSlice_NumElements_;
-				uavDesc.Buffer.StructureByteStride = uav.structureByteStride_;
-				if(uavDesc.Format == DXGI_FORMAT_R32_TYPELESS && uav.structureByteStride_ == 0)
-					uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_RAW;
-				else
-					uavDesc.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 				firstSubRsc = 0;
 				numSubRsc = 1;
 				break;
 			case ViewDimension::TEX1D:
-				uavDesc.Texture1D.MipSlice = uav.mipSlice_FirstElement_;
-				firstSubRsc = uav.mipSlice_FirstElement_;
 				numSubRsc = 1;
 				break;
 			case ViewDimension::TEX1D_ARRAY:
-				uavDesc.Texture1DArray.MipSlice = uav.mipSlice_FirstElement_;
-				uavDesc.Texture1DArray.ArraySize = uav.arraySize_WSize_;
-				uavDesc.Texture1DArray.FirstArraySlice = uav.firstArraySlice_FirstWSlice_NumElements_;
-				firstSubRsc = uav.mipSlice_FirstElement_ +
-				              (uav.firstArraySlice_FirstWSlice_NumElements_ * texture->desc_.levels_);
+				texUsage |= TEXTURE_USAGE_2D_ARRAY_VIEW
 				numSubRsc = uav.arraySize_WSize_;
 				break;
 			case ViewDimension::TEX2D:
-				uavDesc.Texture2D.MipSlice = uav.mipSlice_FirstElement_;
-				uavDesc.Texture2D.PlaneSlice = uav.planeSlice_;
-				firstSubRsc = uav.mipSlice_FirstElement_;
 				numSubRsc = 1;
 				break;
 			case ViewDimension::TEX2D_ARRAY:
-				uavDesc.Texture2DArray.MipSlice = uav.mipSlice_FirstElement_;
-				uavDesc.Texture2DArray.ArraySize = uav.arraySize_WSize_;
-				uavDesc.Texture2DArray.FirstArraySlice = uav.firstArraySlice_FirstWSlice_NumElements_;
-				uavDesc.Texture2DArray.PlaneSlice = uav.planeSlice_;
-				firstSubRsc = uav.mipSlice_FirstElement_ +
-				              (uav.firstArraySlice_FirstWSlice_NumElements_ * texture->desc_.levels_);
+				texUsage |= TEXTURE_USAGE_2D_ARRAY_VIEW
 				numSubRsc = texture->desc_.levels_ * uav.arraySize_WSize_;
 				break;
 			case ViewDimension::TEX3D:
-				uavDesc.Texture3D.MipSlice = uav.mipSlice_FirstElement_;
-				uavDesc.Texture3D.FirstWSlice = uav.firstArraySlice_FirstWSlice_NumElements_;
-				uavDesc.Texture3D.WSize = uav.arraySize_WSize_;
-				firstSubRsc = uav.mipSlice_FirstElement_;
 				numSubRsc = 1;
 				break;
 			default:
@@ -1230,30 +1253,41 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 				break;
 			}
 
-			auto resource = GetD3D12Resource(uavHandle);
+			auto resource = GetTFResource(uavHandle);
 			DBG_ASSERT(resource);
-			pbs->uavTransitions_[bindingIdx].resource_ = &(*resource);
-			pbs->uavTransitions_[bindingIdx].firstSubRsc_ = firstSubRsc;
-			pbs->uavTransitions_[bindingIdx].numSubRsc_ = numSubRsc;
+			pbs->uavs_[bindingIdx].pName = "%i", bindingIdx;
+			if(texture)
+			{
+				pbs->uavs_[bindingIdx].mTextureUsage = texUsage;
+				pbs->uavs_[bindingIdx].ppTextures = {&(*resource->resource_)};
+			}
+			else //buffer
+			{
+				pbs->uavs_[bindingIdx].pOffsets = firstSubRsc;
+				pbs->uavs_[bindingIdx].ppBuffers = {&(*resource->resource_)};
+			}
+			pbs->uavs_[bindingIdx].mCount = numSubRsc;
 		}
 
-		return device_->UpdateUAVs(
-		    *pbs, base, descs.size(), pbs->uavTransitions_.data() + base, uavDescs.data() + base);
+		return ErrorCode::OK;
 	}
 
 	GPU::ErrorCode GPU::TFBackend::UpdatePipelineBindings(Handle handle, i32 base, Core::ArrayView<const SamplerState> descs)
 	{
 		auto pbs = pipelineBindingSets_.Write(handle);
 
-		Core::Array<D3D12_SAMPLER_DESC, MAX_SAMPLER_BINDINGS> samplerDescs;
-
 		i32 bindingIdx = base;
 		for(i32 i = 0; i < descs.size(); ++i, ++bindingIdx)
 		{
-			samplerDescs[bindingIdx] = GetSampler(descs[i]);
+			if(pbs->samplers_[bindingIdx])
+				::removeSampler(renderer_, pbs->samplers_[bindingIdx]);
+			::addSampler(renderer_, &GetSampler(descs[i]), &pbs->samplers_[bindingIdx]);
+			pbs->samplerBinds_[bindingIdx].pName = "%i", bindingIdx;
+			pbs->samplerBinds_[bindingIdx].ppSamplers = {&pbs->samplers_[bindingIdx]};
+			pbs->samplerBinds_[bindingIdx].mCount = 1;
 		}
 
-		return device_->UpdateSamplers(*pbs, base, descs.size(), samplerDescs.data() + base);
+		return ErrorCode::OK;
 	}
 
 	GPU::ErrorCode GPU::TFBackend::CopyPipelineBindings(
@@ -1283,21 +1317,6 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 				DBG_ASSERT((srcOffset + num) <= srcAlloc.size_);
 
 #if ENABLE_DESCRIPTOR_DEBUG_DATA
-				for(i32 i = 0; i < num; ++i)
-				{
-					auto& dstDebug = dstAlloc.GetDebugData(dstOffset + i);
-					const auto& srcDebug = srcAlloc.GetDebugData(srcOffset + i);
-					DBG_ASSERT(srcDebug.subType_ == subType);
-					if(srcDebug.subType_ != DescriptorHeapSubType::SAMPLER)
-					{
-						DBG_ASSERT(srcDebug.resource_);
-					}
-					else
-					{
-						DBG_ASSERT(!srcDebug.resource_);
-					}
-					dstDebug = srcDebug;
-				}
 #endif
 
 				d3dDevice->CopyDescriptorsSimple(num, dstHandle, srcHandle, type);
@@ -1333,72 +1352,6 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 	GPU::ErrorCode GPU::TFBackend::ValidatePipelineBindings(Core::ArrayView<const PipelineBinding> pb)
 	{
 #if ENABLE_DESCRIPTOR_DEBUG_DATA
-		auto LogDescriptors = [this](const char* name, const PipelineBinding& pb) {
-			const auto& pbs = pipelineBindingSets_[pb.pbs_.GetIndex()];
-
-			Core::Log("Descriptor (%d):\n", pb.pbs_.GetIndex());
-			Core::Log("- CBV Base: %d, %d\n", pbs.cbvs_.offset_, pb.cbvs_.dstOffset_);
-			Core::Log("- SRV Base: %d, %d\n", pbs.srvs_.offset_, pb.srvs_.dstOffset_);
-			Core::Log("- UAV Base: %d, %d\n", pbs.uavs_.offset_, pb.uavs_.dstOffset_);
-			Core::Log("- Sampler Base: %d, %d\n", pbs.samplers_.offset_, pb.samplers_.dstOffset_);
-
-			Core::Log("- CBVs: %d\n", pbs.cbvs_.size_);
-			for(i32 i = 0; i < pbs.cbvs_.size_; ++i)
-			{
-				const auto& debugData = pbs.cbvs_.GetDebugData(i);
-				Core::Log("- - %d: %d, %s\n", i, debugData.subType_, debugData.name_);
-			}
-
-			Core::Log("- SRVs: %d\n", pbs.srvs_.size_);
-			for(i32 i = 0; i < pbs.srvs_.size_; ++i)
-			{
-				const auto& debugData = pbs.srvs_.GetDebugData(i);
-				Core::Log("- - %d: %d, %s\n", i, debugData.subType_, debugData.name_);
-			}
-
-			Core::Log("- UAVs: %d\n", pbs.uavs_.size_);
-			for(i32 i = 0; i < pbs.uavs_.size_; ++i)
-			{
-				const auto& debugData = pbs.cbvs_.GetDebugData(i);
-				Core::Log("- - %d: %d, %s\n", i, debugData.subType_, debugData.name_);
-			}
-
-			Core::Log("- Samplers: %d\n", pbs.samplers_.size_);
-			for(i32 i = 0; i < pbs.samplers_.size_; ++i)
-			{
-				const auto& debugData = pbs.samplers_.GetDebugData(i);
-				Core::Log("- - %d: %d, %s\n", i, debugData.subType_, debugData.name_);
-			}
-		};
-
-		for(auto singlePb : pb)
-		{
-			LogDescriptors("desc", singlePb);
-			const auto& pbs = pipelineBindingSets_[singlePb.pbs_.GetIndex()];
-			{
-				for(i32 i = 0; i < pb[0].samplers_.num_; ++i)
-				{
-					DBG_ASSERT(pbs.samplers_.GetDebugData(i).subType_ == DescriptorHeapSubType::SAMPLER);
-				}
-
-				for(i32 i = 0; i < pb[0].cbvs_.num_; ++i)
-				{
-					DBG_ASSERT(pbs.cbvs_.GetDebugData(i).subType_ == DescriptorHeapSubType::CBV);
-					DBG_ASSERT(pbs.cbvs_.GetDebugData(i).resource_);
-				}
-
-				for(i32 i = 0; i < pb[0].srvs_.num_; ++i)
-				{
-					DBG_ASSERT(pbs.srvs_.GetDebugData(i).subType_ == DescriptorHeapSubType::SRV);
-				}
-
-				for(i32 i = 0; i < pb[0].uavs_.num_; ++i)
-				{
-					DBG_ASSERT(pbs.uavs_.GetDebugData(i).subType_ == DescriptorHeapSubType::UAV);
-					DBG_ASSERT(pbs.uavs_.GetDebugData(i).resource_);
-				}
-			}
-		}
 #endif // ENABLE_DESCRIPTOR_DEBUG_DATA
 		return ErrorCode::OK;
 	}
@@ -1438,11 +1391,7 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 	{
 		auto swapChain = swapchainResources_.Write(handle);
 
-		HRESULT retVal = S_OK;
-		CHECK_D3D(retVal = swapChain->swapChain_->Present(0, 0));
-		if(FAILED(retVal))
-			return ErrorCode::FAIL;
-		swapChain->bbIdx_ = swapChain->swapChain_->GetCurrentBackBufferIndex();
+		::queuePresent(tfDirectQueue_, swapChain->swapChain_, swapChain->bbIdx_, 1, frameSemaphore_);
 		return ErrorCode::OK;
 	}
 
@@ -1450,17 +1399,68 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 	{
 		auto swapChain = swapchainResources_.Write(handle);
 
-		ErrorCode retVal = device_->ResizeSwapChain(*swapChain, width, height);
-		if(retVal != ErrorCode::OK)
-			return retVal;
-		swapChain->bbIdx_ = swapChain->swapChain_->GetCurrentBackBufferIndex();
+		// Wait until GPU has finished with the swap chain.
+		if((i64)d3dFrameFence_->GetCompletedValue() < frameIdx_)
+		{
+			d3dFrameFence_->SetEventOnCompletion(frameIdx_, frameFenceEvent_);
+			::WaitForSingleObject(frameFenceEvent_, INFINITE);
+		}
+
+		::SwapChainDesc desc = swapChain_->swapChain_.mDesc;
+
+		if((width == desc.mWidth) && height == desc.mHeight))
+			return ErrorCode::OK;
+		else
+		{
+			desc.mWidth = width;
+			desc.mHeight = height;
+		}
+
+		::removeSwapChain(renderer_, swapChain->swapChain_);
+		::addSwapChain(renderer_, &desc, swapChain->swapChain_);
+
+		//swapChain.bbIdx_ = 0;
+
 		return ErrorCode::OK;
 	}
 
 	void GPU::TFBackend::NextFrame()
 	{
-		if(device_)
-			device_->NextFrame();
+		::queueSubmit(tfDirectQueue_, );
+		if(tfFrameFence_)
+		{
+			// Flush pending uploads and wait before resetting.
+			if(FlushUploads(0, 0))
+			{
+				if((i64)d3dUploadFence_->GetCompletedValue() < uploadFenceIdx_)
+				{
+					d3dUploadFence_->SetEventOnCompletion(uploadFenceIdx_, uploadFenceEvent_);
+					::WaitForSingleObject(uploadFenceEvent_, INFINITE);
+				}
+			}
+
+			i64 completedValue = (i64)d3dFrameFence_->GetCompletedValue();
+			i64 waitValue = (frameIdx_ - MAX_GPU_FRAMES) + 1;
+			if(completedValue < waitValue)
+			{
+				d3dFrameFence_->SetEventOnCompletion(waitValue, frameFenceEvent_);
+				::WaitForSingleObject(frameFenceEvent_, INFINITE);
+			}
+
+			frameIdx_++;
+
+			// Reset allocators as we go along.
+			GetUploadAllocator().Reset();
+			GetSamplerDescriptorAllocator().Reset();
+			GetViewDescriptorAllocator().Reset();
+			GetRTVDescriptorAllocator().Reset();
+			GetDSVDescriptorAllocator().Reset();
+			GetCBVSubAllocator().Reset();
+			GetSRVSubAllocator().Reset();
+			GetUAVSubAllocator().Reset();
+
+			d3dDirectQueue_->Signal(d3dFrameFence_.Get(), frameIdx_);
+		}
 	}
 
 	void GPU::TFBackend::CreateCommandQueues()
@@ -1487,7 +1487,10 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		const auto& defaultSamplers = GetDefaultSamplerStates();
 		tfStaticSamplers_ = Core::Vector(defaultSamplers.size());
 		for(i32 idx = 0; idx != defaultSamplers.size(); ++idx)
-			::addSampler(renderer_, &GetSampler(defaultSamplers[idx]), &tfStaticSamplers_[idx]);
+		{
+			::SamplerDesc samplerDesc = GetSampler(defaultSamplers[idx]);
+			::addSampler(renderer_, &samplerDesc, &tfStaticSamplers_[idx]);
+		}
 	}
 
 	void GPU::TFDevice::CreateCommandSignatures()
@@ -1512,19 +1515,19 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 
 		::CommandSignatureDesc drawDesc = {};
 		//drawDesc.pCmdPool =;
-		drawDesc.pRootSignature = nullptr; // Unused, but asserts on The-Forge (make a PR)
+		drawDesc.pRootSignature = nullptr;
 		drawDesc.mIndirectArgCount = 1;
 		drawDesc.pArgDescs = &drawArg;
 
 		::CommandSignatureDesc drawIndexedDesc = {};
 		//drawIndexedDesc.pCmdPool =;
-		drawIndexedDesc.pRootSignature = nullptr; // Unused, but asserts on The-Forge (make a PR)
+		drawIndexedDesc.pRootSignature = nullptr;
 		drawIndexedDesc.mIndirectArgCount = 1;
 		drawIndexedDesc.pArgDescs = &drawIndexedArg;
 
 		::CommandSignatureDesc dispatchDesc = {};
 		//dispatchDesc.pCmdPool =;
-		dispatchDesc.pRootSignature = nullptr; // Unused, but asserts on The-Forge (make a PR)
+		dispatchDesc.pRootSignature = nullptr;
 		dispatchDesc.mIndirectArgCount = 1;
 		dispatchDesc.pArgDescs = &dispatchArg;
 
@@ -1568,11 +1571,11 @@ EXPORT bool GetPlugin(struct Plugin::Plugin* outPlugin, Core::UUID uuid)
 		{
 			return textureResources_.Read(handle);
 		}
-		else if(handle.GetType() == ResourceType::SWAP_CHAIN)
-		{
-			auto swapChain = swapchainResources_.Read(handle);
-			return ResourceRead<TFTexture>(std::move(swapChain), *swapChain);
-		}
+		//else if(handle.GetType() == ResourceType::SWAP_CHAIN)
+		//{
+		//	auto swapChain = swapchainResources_.Read(handle);
+		//	return ResourceRead<TFTexture>(std::move(swapChain), *swapChain->swapChain); //TODO: get from bufferIdx
+		//}
 		return ResourceRead<TFTexture>();
 	}
 

@@ -154,25 +154,25 @@ namespace GPU
 			FlushTransitions();
 			if(dbs->ib_.BufferLocation == 0)
 			{
-				d3dCommandList_->ExecuteIndirect(backend_.device_->d3dDrawCmdSig_.Get(), command->maxCommands_,
-				    indirectBuffer->resource_.Get(), command->argByteOffset_, countBuffer->resource_.Get(),
-				    command->countByteOffset_);
+				::cmdExecuteIndirect(tfCommandList_, backend_->tfDrawCmdSig_, command->maxCommands_, 
+				    indirectBuffer->resource_, command->argByteOffset_, countBuffer->resource_, 
+					command->countByteOffset_);
 			}
 			else
 			{
-				d3dCommandList_->ExecuteIndirect(backend_.device_->d3dDrawIndexedCmdSig_.Get(), command->maxCommands_,
-				    indirectBuffer->resource_.Get(), command->argByteOffset_, countBuffer->resource_.Get(),
-				    command->countByteOffset_);
+				::cmdExecuteIndirect(tfCommandList_, backend_->tfDrawIndexedCmdSig_, command->maxCommands_, 
+				    indirectBuffer->resource_, command->argByteOffset_, countBuffer->resource_, 
+					command->countByteOffset_);
 			}
 		}
 		else
 		{
-			d3dCommandList_->IASetPrimitiveTopology(GetPrimitiveTopology(command->primitive_));
+			//d3dCommandList_->IASetPrimitiveTopology(GetPrimitiveTopology(command->primitive_));
 
-			FlushTransitions();
-			d3dCommandList_->ExecuteIndirect(backend_.device_->d3dDrawCmdSig_.Get(), command->maxCommands_,
-			    indirectBuffer->resource_.Get(), command->argByteOffset_, countBuffer->resource_.Get(),
-			    command->countByteOffset_);
+			//FlushTransitions();
+			::cmdExecuteIndirect(tfCommandList_, backend_->tfDrawCmdSig_, command->maxCommands_, 
+				indirectBuffer->resource_, command->argByteOffset_, countBuffer->resource_, 
+				command->countByteOffset_);
 		}
 		return ErrorCode::OK;
 	}
@@ -182,7 +182,7 @@ namespace GPU
 		SetPipeline(command->pipelineState_, command->pipelineBindings_);
 
 		FlushTransitions();
-		d3dCommandList_->Dispatch(command->xGroups_, command->yGroups_, command->zGroups_);
+		::cmdDispatch(tfCommandList, command->xGroups_, command->yGroups_, command->zGroups_);
 		return ErrorCode::OK;
 	}
 
@@ -199,78 +199,59 @@ namespace GPU
 			AddTransition(&(*countBuffer), 0, 1, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT);
 
 		FlushTransitions();
-		d3dCommandList_->ExecuteIndirect(backend_.device_->d3dDispatchCmdSig_.Get(), command->maxCommands_,
-		    indirectBuffer->resource_.Get(), command->argByteOffset_, countBuffer->resource_.Get(),
-		    command->countByteOffset_);
+		::cmdExecuteIndirect(tfCommandList_, backend_->tfDispatchCmdSig_, command->maxCommands_, 
+			indirectBuffer->resource_, command->argByteOffset_, countBuffer->resource_, 
+			command->countByteOffset_);
 		return ErrorCode::OK;
 	}
 
 	ErrorCode TFCompileContext::CompileCommand(const CommandClearRTV* command)
 	{
-		auto fbs = backend_.frameBindingSets_.Read(command->frameBinding_);
-		DBG_ASSERT(command->rtvIdx_ < fbs->numRTs_);
-
-		i32 rtvIdx =
-		    fbs->swapChain_ == nullptr ? command->rtvIdx_ : command->rtvIdx_ + fbs->swapChain_->bbIdx_ * MAX_BOUND_RTVS;
-
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = fbs->rtvs_.GetCPUHandle(rtvIdx);
-
-		auto& subRsc = fbs->rtvResources_[rtvIdx];
-		AddTransition(subRsc, D3D12_RESOURCE_STATE_RENDER_TARGET);
-		FlushTransitions();
-
-		d3dCommandList_->ClearRenderTargetView(handle, command->color_, 0, nullptr);
+		// We need to defer clears to the cmdBindRenderTargets command.
+		auto fbs = backend_.frameBindingSets_.Write(command->frameBinding_);
+		fbs.loadActionsDesc_.mClearColorValues[rtvIdx_] = (::ClearValue)color_;
+		fbs.loadActionsDesc_.mLoadActionsColor[rtvIdx_] = LOAD_ACTIONS_CLEAR;
 
 		return ErrorCode::OK;
 	}
 
 	ErrorCode TFCompileContext::CompileCommand(const CommandClearDSV* command)
 	{
-		auto fbs = backend_.frameBindingSets_.Read(command->frameBinding_);
-		DBG_ASSERT(fbs->desc_.dsv_.resource_);
-
-		D3D12_CPU_DESCRIPTOR_HANDLE handle = fbs->dsv_.GetCPUHandle(0);
-
-		auto& subRsc = fbs->dsvResource_;
-		AddTransition(subRsc, D3D12_RESOURCE_STATE_DEPTH_WRITE);
-		FlushTransitions();
-
-		d3dCommandList_->ClearDepthStencilView(
-		    handle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, command->depth_, command->stencil_, 0, nullptr);
+		// We need to defer clears to the cmdBindRenderTargets command.
+		auto fbs = backend_.frameBindingSets_.Write(command->frameBinding_);
+		fbs.loadActionsDesc_.mClearDepth = (::ClearValue){depth_, stencil_};
+		fbs.loadActionsDesc_.mLoadActionDepth = LOAD_ACTIONS_CLEAR;
+		fbs.loadActionsDesc_.mLoadActionStencil = LOAD_ACTIONS_CLEAR;
 
 		return ErrorCode::OK;
 	}
 
 	ErrorCode TFCompileContext::CompileCommand(const CommandClearUAV* command)
 	{
-		auto pbs = backend_.pipelineBindingSets_.Read(command->pipelineBinding_);
+		//auto pbs = backend_.pipelineBindingSets_.Read(command->pipelineBinding_);
 
-		D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = pbs->uavs_.GetGPUHandle(command->uavIdx_);
-		D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = pbs->uavs_.GetCPUHandle(command->uavIdx_);
+		//D3D12_GPU_DESCRIPTOR_HANDLE gpuHandle = pbs->uavs_.GetGPUHandle(command->uavIdx_);
+		//D3D12_CPU_DESCRIPTOR_HANDLE cpuHandle = pbs->uavs_.GetCPUHandle(command->uavIdx_);
 
-		auto& subRsc = pbs->uavTransitions_[command->uavIdx_];
-		AddTransition(subRsc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-		FlushTransitions();
+		//auto& subRsc = pbs->uavTransitions_[command->uavIdx_];
+		//AddTransition(subRsc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+		//FlushTransitions();
 
-		d3dCommandList_->ClearUnorderedAccessViewUint(
-		    gpuHandle, cpuHandle, subRsc.resource_->resource_.Get(), command->u_, 0, nullptr);
+		//d3dCommandList_->ClearUnorderedAccessViewUint(
+		//    gpuHandle, cpuHandle, subRsc.resource_->resource_.Get(), command->u_, 0, nullptr);
 
-		return ErrorCode::OK;
+		//return ErrorCode::OK;
+		return ErrorCode::UNIMPLEMENTED;
 	}
 
 	ErrorCode TFCompileContext::CompileCommand(const CommandUpdateBuffer* command)
 	{
-		auto buf = backend_.GetD3D12Buffer(command->buffer_);
+		auto buf = backend_.GetTFBuffer(command->buffer_);
 		DBG_ASSERT(buf && buf->resource_);
 
-		auto uploadAlloc = backend_.device_->GetUploadAllocator().Alloc(command->size_);
-		memcpy(uploadAlloc.address_, command->data_, command->size_);
-
-		AddTransition(&(*buf), 0, 1, D3D12_RESOURCE_STATE_COPY_DEST);
-		FlushTransitions();
-
-		d3dCommandList_->CopyBufferRegion(buf->resource_.Get(), command->offset_, uploadAlloc.baseResource_.Get(),
-		    uploadAlloc.offsetInBaseResource_, command->size_);
+		::BufferUpdateDesc desc = ::BufferUpdateDesc(buf->resource_, 
+		    command->data_, 0, command->offset_, command->size_);
+		::updateResource(desc, false);
 
 		return ErrorCode::OK;
 	}
@@ -320,30 +301,36 @@ namespace GPU
 		FlushTransitions();
 		d3dCommandList_->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 
+		::TextureUpdateDesc updateDesc = {0};
+		updateDesc.pTexture = buf->resource_;
+		updateDesc.pImage =;
+		::updateResource(&updateDesc, false);
+
 		return ErrorCode::OK;
 	}
 
 	ErrorCode TFCompileContext::CompileCommand(const CommandCopyBuffer* command)
 	{
-		auto dstBuf = backend_.GetD3D12Buffer(command->dstBuffer_);
-		auto srcBuf = backend_.GetD3D12Buffer(command->srcBuffer_);
+		auto dstBuf = backend_.GetTFBuffer(command->dstBuffer_);
+		auto srcBuf = backend_.GetTFBuffer(command->srcBuffer_);
 		DBG_ASSERT(dstBuf && dstBuf->resource_);
 		DBG_ASSERT(srcBuf && srcBuf->resource_);
 
-		AddTransition(&(*dstBuf), 0, 1, D3D12_RESOURCE_STATE_COPY_DEST);
-		AddTransition(&(*srcBuf), 0, 1, D3D12_RESOURCE_STATE_COPY_SOURCE);
-		FlushTransitions();
+		//AddTransition(&(*dstBuf), 0, 1, D3D12_RESOURCE_STATE_COPY_DEST);
+		//AddTransition(&(*srcBuf), 0, 1, D3D12_RESOURCE_STATE_COPY_SOURCE);
+		//FlushTransitions();
 
-		d3dCommandList_->CopyBufferRegion(dstBuf->resource_.Get(), command->dstOffset_, srcBuf->resource_.Get(),
-		    command->srcOffset_, command->srcSize_);
+		::BufferUpdateDesc desc = ::BufferUpdateDesc(buf->resource_, 
+		    srcBuf->resource_, command->srcOffset_, command->dstOffset_, command->size_);
+		::updateResource(desc, false);
 
 		return ErrorCode::OK;
 	}
 
 	ErrorCode TFCompileContext::CompileCommand(const CommandCopyTextureSubResource* command)
 	{
-		auto dstTex = backend_.GetD3D12Texture(command->dstTexture_);
-		auto srcTex = backend_.GetD3D12Texture(command->srcTexture_);
+		auto dstTex = backend_.GetTFTexture(command->dstTexture_);
+		auto srcTex = backend_.GetTFTexture(command->srcTexture_);
 		DBG_ASSERT(dstTex && dstTex->resource_);
 		DBG_ASSERT(srcTex && srcTex->resource_);
 
@@ -380,27 +367,30 @@ namespace GPU
 		{
 			dbsBound_ = dbsHandle;
 
-			auto dbs = backend_.drawBindingSets_.Read(dbsHandle);
+			auto dbs = drawBindingSets_.Read(dbsHandle);
 
 			// Setup draw binding.
-			if(dbs->ibResource_)
+			if(dbs->iBuffer_)
 			{
-				AddTransition(dbs->ibResource_, 0, 1, D3D12_RESOURCE_STATE_INDEX_BUFFER);
-				d3dCommandList_->IASetIndexBuffer(&dbs->ib_);
+				::cmdBindIndexBuffer(tfCommandList_, &dbs->iBuffer_);
 			}
 
+			u32 bufferCount = 0;
 			for(i32 i = 0; i < MAX_VERTEX_STREAMS; ++i)
-				if(dbs->vbResources_[i])
-					AddTransition(dbs->vbResources_[i], 0, 1, D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER);
+				if(dbs->vBuffers_[i])
+					bufferCount += 1;
+			if(bufferCount)
+			{
+				::cmdBindVertexBuffer(tfCommandList_, bufferCount, dbs->vbs_.data(), 0);
+			}
 
-			d3dCommandList_->IASetVertexBuffers(0, MAX_VERTEX_STREAMS, dbs->vbs_.data());
 		}
 
-		if(primitiveBound_ != primitive)
-		{
-			primitiveBound_ = primitive;
-			d3dCommandList_->IASetPrimitiveTopology(GetPrimitiveTopology(primitive));
-		}
+		//if(primitiveBound_ != primitive)
+		//{
+		//	primitiveBound_ = primitive;
+		//	d3dCommandList_->IASetPrimitiveTopology(GetPrimitiveTopology(primitive));
+		//}
 		return ErrorCode::OK;
 	}
 
@@ -408,12 +398,12 @@ namespace GPU
 	{
 		DBG_ASSERT(pb.size() == 1);
 		DBG_ASSERT(pb[0].pbs_.IsValid());
-		auto pbs = backend_.pipelineBindingSets_.Read(pb[0].pbs_);
+		auto pbs = pipelineBindingSets_.Read(pb[0].pbs_);
 		DBG_ASSERT(pbs->shaderVisible_);
 
-#if !defined(_RELEASE)
-		backend_.ValidatePipelineBindings(pb);
-#endif
+		//::DescriptorData descData;
+
+		//::cmdBindDescriptors(tfCommandList_, pbs->rootSignature_, ?, ?);
 
 		auto device = backend_.device_;
 		const i32 samplerIncrSize =
@@ -473,17 +463,15 @@ namespace GPU
 			d3dCommandList_->SetDescriptorHeaps(2, &descHeapsBound_[0]);
 		}
 
-		ID3D12PipelineState* d3d12PipelineState = nullptr;
-		RootSignatureType rootSig = RootSignatureType::INVALID;
 		if(ps.GetType() == ResourceType::COMPUTE_PIPELINE_STATE)
 		{
-			d3d12PipelineState = backend_.computePipelineStates_.Read(ps)->pipelineState_.Get();
-			rootSig = RootSignatureType::COMPUTE;
+			auto tfPipleine = computePipelineStates_.Read(ps);
+			::cmdBindPipeline(tfCommandList_, tfPipeline->pipeline_);
 		}
 		if(ps.GetType() == ResourceType::GRAPHICS_PIPELINE_STATE)
 		{
-			d3d12PipelineState = backend_.graphicsPipelineStates_.Read(ps)->pipelineState_.Get();
-			rootSig = RootSignatureType::GRAPHICS;
+			auto tfPipleine = graphicsPipelineStates_.Read(ps);
+			::cmdBindPipeline(tfCommandList_, tfPipeline->pipeline_);
 		}
 
 		if(psBound_ != d3d12PipelineState)
@@ -611,6 +599,16 @@ namespace GPU
 
 		d3dCommandList_->OMSetRenderTargets(fbs->numRTs_, rtvDesc, TRUE, dsvDesc);
 
+//API_INTERFACE void CALLTYPE cmdBindRenderTargets(Cmd* p_cmd, uint32_t render_target_count, RenderTarget** pp_render_targets, RenderTarget* p_depth_stencil, const LoadActionsDesc* loadActions, uint32_t* pColorArraySlices, uint32_t* pColorMipSlices, uint32_t depthArraySlice, uint32_t depthMipSlice);
+
+		::LoadActionsDesc la = {0};
+	//ClearValue				la.mClearColorValues[MAX_RENDER_TARGET_ATTACHMENTS];
+	//LoadActionType			la.mLoadActionsColor[MAX_RENDER_TARGET_ATTACHMENTS];
+	//ClearValue				la.mClearDepth;
+	//LoadActionType			la.mLoadActionDepth;
+	//LoadActionType			la.mLoadActionStencil;
+		::cmdBindRenderTargets(tfCommandList_, fbs->numRTs_, fbs->renderTargets_.data(), fbs->dsRenderTarget_, &la, 1, 1, 1, 1);
+
 		return ErrorCode::OK;
 	}
 
@@ -620,31 +618,22 @@ namespace GPU
 		{
 			if(drawState->viewport_ != cachedViewport_)
 			{
-				D3D12_VIEWPORT viewport;
-				viewport.TopLeftX = drawState->viewport_.x_;
-				viewport.TopLeftY = drawState->viewport_.y_;
-				viewport.Width = drawState->viewport_.w_;
-				viewport.Height = drawState->viewport_.h_;
-				viewport.MinDepth = drawState->viewport_.zMin_;
-				viewport.MaxDepth = drawState->viewport_.zMax_;
-				d3dCommandList_->RSSetViewports(1, &viewport);
+				::cmdSetViewport(tfCommandList_, drawState->viewport_.x_, drawState->viewport_.y_, 
+				    drawState->viewport_.w_, drawState->viewport_.h_, 
+					drawState->viewport_.zMin_, drawState->viewport_.zMax_);
 				cachedViewport_ = drawState->viewport_;
 			}
 
 			if(drawState->scissorRect_ != cachedScissorRect_)
 			{
-				D3D12_RECT scissorRect;
-				scissorRect.left = drawState->scissorRect_.x_;
-				scissorRect.top = drawState->scissorRect_.y_;
-				scissorRect.right = drawState->scissorRect_.x_ + drawState->scissorRect_.w_;
-				scissorRect.bottom = drawState->scissorRect_.y_ + drawState->scissorRect_.h_;
-				d3dCommandList_->RSSetScissorRects(1, &scissorRect);
+				::cmdSetScissor(tfCommandList_, drawState->scissorRect_.x_, drawState->scissorRect_.y_
+				    drawState->scissorRect_.w_, drawState->scissorRect_.h_);
 				cachedScissorRect_ = drawState->scissorRect_;
 			}
 
 			if(drawState->stencilRef_ != cachedStencilRef_)
 			{
-				d3dCommandList_->OMSetStencilRef(drawState->stencilRef_);
+				//d3dCommandList_->OMSetStencilRef(drawState->stencilRef_);
 				cachedStencilRef_ = drawState->stencilRef_;
 			}
 		}
@@ -702,6 +691,8 @@ namespace GPU
 	void TFCompileContext::AddUAVBarrier(const D3D12SubresourceRange& subRsc)
 	{
 		DBG_ASSERT(subRsc);
+
+		cmdSynchronizeResources(tfCommandList_, 1, &buffer_);
 
 		// Only submit a UAV barrier if there was no change to state.
 		if(!AddTransition(subRsc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS))
