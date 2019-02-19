@@ -1,3 +1,9 @@
+IF(WIN32)
+	SET(LINK_LIBRARIES Remotery etlsf tlsf dbghelp)
+ELSE()
+	SET(LINK_LIBRARIES Remotery etlsf tlsf sc)
+ENDIF()
+
 SET(SOURCES_PUBLIC 
 	"allocator.h"
 	"allocator_tlsf.h"
@@ -92,6 +98,6 @@ INCLUDE_DIRECTORIES(
 )
 
 ADD_ENGINE_LIBRARY(core ${SOURCES_PUBLIC} ${SOURCES_ISPC} ${SOURCES_PRIVATE} ${SOURCES_TESTS})
-TARGET_LINK_LIBRARIES(core Remotery etlsf tlsf dbghelp sc)
+TARGET_LINK_LIBRARIES(core ${LINK_LIBRARIES})
 
 
