@@ -15,6 +15,10 @@ INCLUDE(projects)
 
 # Setup option
 OPTION(ENGINE_BUILD_GPU_D3D12 "Build Direct3D 12 backend." ON)
+OPTION(ENGINE_THEFORGE_VLK "Build The-Forge Vulkan backend." OFF)
+OPTION(ENGINE_THEFORGE_DX11 "Build The-Forge Direct3D 11 backend." OFF)
+OPTION(ENGINE_THEFORGE_DX12 "Build The-Forge Direct3D 12 backend." OFF)
+OPTION(ENGINE_THEFORGE_MTL "Build The-Forge Metal backend." OFF)
 
 # Setup ISPC
 SET(ISPC_TARGETS avx2)
