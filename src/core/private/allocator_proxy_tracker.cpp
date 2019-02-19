@@ -4,6 +4,14 @@
 #include "core/debug.h"
 #include "core/map.h"
 
+#if PLATFORM_LINUX
+#include <memory.h>
+#include <string.h>
+
+// TODO: Stick to strncpy? See what is available on Windows.
+#define strcpy_s(dst, sz, src) strncpy(dst, src, sz)
+#endif
+
 namespace Core
 {
 	struct PointerHasher

@@ -387,7 +387,7 @@ namespace Core
 
 		struct RWLockImpl* Get();
 		struct RWLockImpl* Get() const;
-		mutable u8 implData_[8];
+		mutable u8 implData_[56];
 	};
 
 	/**
@@ -479,7 +479,11 @@ namespace Core
 		TLS& operator=(TLS&&) = delete;
 		TLS(const TLS&) = delete;
 
-		i32 handle_ = -1;
+		union
+		{
+			i32 handle_;
+			u32 key_;
+		};
 	};
 
 	/**
@@ -515,7 +519,11 @@ namespace Core
 		FLS& operator=(FLS&&) = delete;
 		FLS(const FLS&) = delete;
 
-		i32 handle_ = -1;
+		union
+		{
+			i32 handle_;
+			u32 key_;
+		};
 	};
 
 } // namespace Core
