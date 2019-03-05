@@ -11,7 +11,7 @@ struct PluginTestAdvancedVtbl
 	GetNumberFn GetNumber_ = nullptr;
 };
 
-class PluginTestAdvanced : Plugin::Plugin
+class PluginTestAdvanced : public Plugin::Plugin
 {
 public:
 	DECLARE_PLUGININFO(PluginTestAdvanced, 0);

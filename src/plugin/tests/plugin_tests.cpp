@@ -12,6 +12,9 @@
 #include "plugin_test_basic.h"
 #include "plugin_test_advanced.h"
 
+// Workaround.
+static const u32 TEST_MAGIC = 0x1e8c6a9b;
+
 namespace
 {
 }
@@ -35,7 +38,7 @@ TEST_CASE("plugin-tests-basic-plugin")
 	found = Plugin::Manager::GetPlugins(&plugin, 1);
 	REQUIRE(found > 0);
 	REQUIRE(plugin.successfullyLoaded_ == true);
-	REQUIRE(plugin.testMagic_ == PluginTestBasic::TEST_MAGIC);
+	REQUIRE(plugin.testMagic_ == TEST_MAGIC);
 }
 
 TEST_CASE("plugin-tests-advanced-plugin")
@@ -67,7 +70,7 @@ TEST_CASE("plugin-tests-basic-reload")
 	found = Plugin::Manager::GetPlugins(&plugin, 1);
 	REQUIRE(found > 0);
 	REQUIRE(plugin.successfullyLoaded_ == true);
-	REQUIRE(plugin.testMagic_ == PluginTestBasic::TEST_MAGIC);
+	REQUIRE(plugin.testMagic_ == TEST_MAGIC);
 
 	// Test initial state.
 	REQUIRE(plugin.GetNumber() == 0);

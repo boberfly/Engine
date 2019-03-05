@@ -11,6 +11,8 @@
 #include "resource/manager.h"
 #include "resource/converter.h"
 
+#include <cstring>
+
 namespace
 {
 	class ConverterContext : public Resource::IConverterContext

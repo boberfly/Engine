@@ -14,6 +14,7 @@
 #include "resource/resource.h"
 
 #include <cstdarg>
+#include <cstring>
 
 namespace
 {

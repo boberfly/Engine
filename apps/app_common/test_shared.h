@@ -21,6 +21,8 @@
 
 #include "Remotery.h"
 
+#include <cstdlib>
+
 namespace
 {
 	GPU::SetupParams GetDefaultSetupParams(const Core::CommandLine& cmdLine)

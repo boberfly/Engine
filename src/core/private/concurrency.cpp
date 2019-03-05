@@ -530,7 +530,7 @@ namespace Core
 #include <pthread.h>
 #include <unistd.h>
 #include <sc.h>
-#include <stdlib.h> // for atoi
+#include <cstdlib> // for atoi
 #include "core/file.h"
 
 #include "Remotery.h"

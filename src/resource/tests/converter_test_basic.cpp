@@ -1,4 +1,5 @@
 #include "resource/converter.h"
+#include "core/os.h"
 #include "core/debug.h"
 #include "core/file.h"
 #include "core/allocator_overrides.h"
