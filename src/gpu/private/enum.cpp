@@ -6,7 +6,7 @@ namespace Core
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::Format::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::Format::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -122,7 +122,7 @@ case GPU::Format::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::TextureType::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::TextureType::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -141,7 +141,7 @@ case GPU::TextureType::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::AddressingMode::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::AddressingMode::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -159,7 +159,7 @@ case GPU::AddressingMode::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::FilteringMode::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::FilteringMode::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -179,7 +179,7 @@ case GPU::FilteringMode::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::BorderColor::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::BorderColor::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -196,7 +196,7 @@ case GPU::BorderColor::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::FillMode::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::FillMode::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -213,7 +213,7 @@ case GPU::FillMode::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::CullMode::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::CullMode::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -231,7 +231,7 @@ case GPU::CullMode::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::BlendType::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::BlendType::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -256,7 +256,7 @@ case GPU::BlendType::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::BlendFunc::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::BlendFunc::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -276,7 +276,7 @@ case GPU::BlendFunc::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::CompareMode::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::CompareMode::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -299,7 +299,7 @@ case GPU::CompareMode::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::StencilFunc::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::StencilFunc::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{
@@ -322,7 +322,7 @@ case GPU::StencilFunc::##ENUM_VALUE : return #ENUM_VALUE;
 	{
 #define CASE_STRING(ENUM_VALUE)                                                                                        \
 	\
-case GPU::ShaderType::##ENUM_VALUE : return #ENUM_VALUE;
+case GPU::ShaderType::ENUM_VALUE : return #ENUM_VALUE;
 
 		switch(val)
 		{

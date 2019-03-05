@@ -4,6 +4,7 @@
 #include "core/misc.h"
 #include "gpu/manager.h"
 
+#include <cstring>
 #include <utility>
 
 namespace GPU
