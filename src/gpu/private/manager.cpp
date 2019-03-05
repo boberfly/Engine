@@ -20,6 +20,7 @@
 
 #include "Remotery.h"
 
+#include <cstdlib>
 #include <cstdarg>
 #include <utility>
 

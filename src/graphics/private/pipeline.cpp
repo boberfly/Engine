@@ -1,5 +1,7 @@
 #include "graphics/pipeline.h"
 
+#include <cstring>
+
 namespace Graphics
 {
 	Pipeline::Pipeline(const char** resourceNames)

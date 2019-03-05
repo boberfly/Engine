@@ -1,5 +1,6 @@
 #include "resource/private/converter_context.h"
 #include "core/misc.h"
+#include "core/os.h"
 #include "core/timer.h"
 #include "job/manager.h"
 

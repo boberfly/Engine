@@ -8,6 +8,8 @@
 #include <stb_c_lexer.h>
 #pragma warning(pop)
 
+#include <cstring>
+
 namespace
 {
 	using namespace Graphics::AST;

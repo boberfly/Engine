@@ -127,12 +127,12 @@ namespace Math
 		//
 		if(iNearest != 0xffffffff)
 		{
-			if(pIntersectionPoint != NULL)
+			if(pIntersectionPoint != nullptr)
 			{
 				*pIntersectionPoint = Intersects[iNearest];
 			}
 
-			if(pIntersectionNormal != NULL)
+			if(pIntersectionNormal != nullptr)
 			{
 				*pIntersectionNormal = Planes[iNearest].Normal();
 			}
@@ -152,7 +152,7 @@ namespace Math
 		}
 
 		// Overlap, compute AABB of intersection.
-		if(pIntersectionBox != NULL)
+		if(pIntersectionBox != nullptr)
 		{
 			pIntersectionBox->Min_.x = Core::Max(Min_.x, Box.Min_.x);
 			pIntersectionBox->Max_.x = Core::Min(Max_.x, Box.Max_.x);

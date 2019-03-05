@@ -23,7 +23,7 @@ namespace Image
 		f32 SingleToSRGB(f32 linearCol)
 		{
 			const f32 sRGBLo = linearCol * 12.92f;
-			const f32 sRGBHi = (std::powf(std::abs(linearCol), 1.0f / 2.4f) * 1.055f) - 0.055f;
+			const f32 sRGBHi = (std::pow(std::abs(linearCol), 1.0f / 2.4f) * 1.055f) - 0.055f;
 			const f32 sRGB = (linearCol <= 0.0031308f) ? sRGBLo : sRGBHi;
 			return sRGB;
 		}
@@ -31,7 +31,7 @@ namespace Image
 		f32 SingleFromSRGB(f32 sRGBCol)
 		{
 			const f32 linearRGBLo = sRGBCol / 12.92f;
-			const f32 linearRGBHi = std::powf((sRGBCol + 0.055f) / 1.055f, 2.4f);
+			const f32 linearRGBHi = std::pow((sRGBCol + 0.055f) / 1.055f, 2.4f);
 			const f32 linearCol = (sRGBCol <= 0.04045f) ? linearRGBLo : linearRGBHi;
 			return linearCol;
 		}

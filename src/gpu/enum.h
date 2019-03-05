@@ -2,7 +2,6 @@
 
 #include "gpu/dll.h"
 #include "gpu/types.h"
-#include "core/enum.h"
 
 namespace Core
 {
@@ -19,3 +18,5 @@ namespace Core
 	GPU_DLL const char* EnumToString(GPU::StencilFunc val);
 	GPU_DLL const char* EnumToString(GPU::ShaderType val);
 }
+
+#include "core/enum.h"

@@ -1,3 +1,4 @@
+#include "gpu/enum.h"
 #include "graphics/model.h"
 #include "graphics/converters/import_model.h"
 #include "graphics/private/model_impl.h"
@@ -7,7 +8,6 @@
 #include "core/misc.h"
 #include "core/pair.h"
 #include "core/type_conversion.h"
-#include "gpu/enum.h"
 #include "gpu/utils.h"
 #include "math/aabb.h"
 #include "math/mat44.h"

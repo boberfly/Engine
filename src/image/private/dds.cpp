@@ -2,6 +2,7 @@
 #include "core/array.h"
 #include "core/file.h"
 #include "core/misc.h"
+#include "core/os.h"
 #include "gpu/types.h"
 #include "gpu/utils.h"
 
@@ -480,7 +481,7 @@ namespace Image
 					sprintf_s(buffer.data(), buffer.size(), "Unable to load \"%s\", unsupported format.",
 					    imageFile.GetPath());
 				}
-				return Image::Image();
+				return Image();
 			}
 
 			if(ddsHeader.dwWidth == 0)
@@ -499,7 +500,7 @@ namespace Image
 			imageFile.Read(data, formatSize);
 
 			// Return setup image.
-			return Image::Image(type, format, ddsHeader.dwWidth, ddsHeader.dwHeight, ddsHeader.dwDepth,
+			return Image(type, format, ddsHeader.dwWidth, ddsHeader.dwHeight, ddsHeader.dwDepth,
 			    ddsHeader.dwMipMapCount, data, [](u8* data) { delete[] data; });
 		}
 	} // namespace DDS

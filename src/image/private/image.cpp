@@ -3,6 +3,7 @@
 #include "core/misc.h"
 #include "gpu/utils.h"
 
+#include <cstring>
 #include <utility>
 
 namespace Image

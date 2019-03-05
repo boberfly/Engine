@@ -46,8 +46,8 @@ SET(SOURCES_TESTS
 	"converters/shader_backend_hlsl.cpp"
 	"converters/shader_backend_metadata.h"
 	"converters/shader_backend_metadata.cpp"
-	"converters/shader_compiler_hlsl.h"
-	"converters/shader_compiler_hlsl.cpp"
+	#"converters/shader_compiler_hlsl.h"
+	#"converters/shader_compiler_hlsl.cpp"
 	"converters/shader_parser.h"
 	"converters/shader_parser.cpp"
 	"converters/shader_preprocessor.h"
@@ -78,13 +78,19 @@ SET(SOURCES_SHADER_CONVERTER
 	"converters/shader_backend_hlsl.cpp"
 	"converters/shader_backend_metadata.h"
 	"converters/shader_backend_metadata.cpp"
-	"converters/shader_compiler_hlsl.h"
-	"converters/shader_compiler_hlsl.cpp"
 	"converters/shader_parser.h"
 	"converters/shader_parser.cpp"
 	"converters/shader_preprocessor.h"
 	"converters/shader_preprocessor.cpp"
 )
+
+IF(ENGINE_BUILD_GPU_D3D12)
+	SET(SOURCES_SHADER_CONVERTER 
+		${SOURCES_SHADER_CONVERTER}
+		"converters/shader_compiler_hlsl.h"
+		"converters/shader_compiler_hlsl.cpp"
+	)
+ENDIF()
 
 SET(SOURCES_TEXTURE_CONVERTER
 	"converters/converter_texture.cpp"

@@ -13,6 +13,8 @@
 #include "graphics/converters/shader_parser.h"
 #include "graphics/converters/shader_preprocessor.h"
 
+#include <cstring>
+
 namespace
 {
 	class PathResolver : public Core::IFilePathResolver

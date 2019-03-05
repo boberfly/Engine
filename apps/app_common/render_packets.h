@@ -10,6 +10,8 @@
 
 #include "common.h"
 
+#include <cstring>
+
 using CustomBindFn = Core::Function<bool(Graphics::Shader*, Graphics::ShaderTechnique&)>;
 
 struct DrawContext

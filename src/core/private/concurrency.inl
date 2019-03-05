@@ -78,8 +78,10 @@ namespace Core
 	// clang-format on
 } // namespace Core
 
-#elif defined(PLATFORM_LINUX) || defined(PLATFORM_ANDROID) || defined(PLATFORM_OSX) || defined(PLATFORM_IOS)
+#elif PLATFORM_POSIX
 #include "core/os.h"
+#include <pthread.h>
+#include <unistd.h>
 
 namespace Core
 {

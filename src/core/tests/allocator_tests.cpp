@@ -9,7 +9,6 @@
 #include "core/random.h"
 #include "core/string.h"
 #include "core/timer.h"
-#include "math/vec4.h"
 
 #include "catch.hpp"
 

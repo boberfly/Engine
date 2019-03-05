@@ -3,6 +3,8 @@
 #include "core/concurrency.h"
 #include "core/debug.h"
 
+#include <utility>
+
 namespace Core
 {
 	/*  Multi-producer/multi-consumer bounded queue.

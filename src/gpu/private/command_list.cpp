@@ -7,6 +7,9 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <cstring>
+
+#include "core/os.h"
 
 namespace GPU
 {

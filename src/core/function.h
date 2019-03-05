@@ -2,6 +2,7 @@
 
 #include "core/debug.h"
 
+#include <cstddef>
 #include <utility>
 
 namespace Core

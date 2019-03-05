@@ -1,7 +1,7 @@
 IF(WIN32)
 	SET(LINK_LIBRARIES Remotery etlsf tlsf dbghelp)
 ELSE()
-	SET(LINK_LIBRARIES Remotery etlsf tlsf sc)
+	SET(LINK_LIBRARIES Remotery etlsf tlsf pthread ${CMAKE_DL_LIBS} sc)
 ENDIF()
 
 SET(SOURCES_PUBLIC 
