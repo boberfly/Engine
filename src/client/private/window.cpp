@@ -3,10 +3,15 @@
 #include "client/key_input.h"
 #include "core/debug.h"
 #include "core/misc.h"
+#include "core/os.h"
 
+#ifdef PLATFORM_LINUX
+#define SDL_VIDEO_DRIVER_X11
+#endif
 #include <SDL.h>
 #include <SDL_syswm.h>
 
+#include <string.h>
 #include <utility>
 
 namespace Client
@@ -300,6 +305,7 @@ namespace Client
 #if PLATFORM_WINDOWS
 		data.handle_ = (void*)wmInfo.info.win.window;
 #elif PLATFORM_LINUX
+		//data.display_ = (void*)wmInfo.info.x11.display;
 		data.handle_ = (void*)wmInfo.info.x11.window;
 #elif PLATFORM_OSX
 		data.handle_ = (void*)wmInfo.info.cocoa.window;

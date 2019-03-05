@@ -10,6 +10,7 @@ namespace Client
 	using WindowPlatformHandle = void*;
 	struct WindowPlatformData
 	{
+		//void* display_ = nullptr; // X11
 		void* handle_ = nullptr;
 	};
 

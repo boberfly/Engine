@@ -2,10 +2,11 @@
 
 #include "catch.hpp"
 
-#if PLATFORM_WINDOWS
-#define WIN32_LEAN_AND_MEAN
 #include "core/os.h"
-#endif
+
+//#if PLATFORM_LINUX
+//#include <X11/Xlib.h>
+//#endif
 
 using namespace Core;
 using namespace Client;
@@ -16,7 +17,7 @@ namespace
 
 TEST_CASE("window-tests-create")
 {
-	auto* window = new Window("window-tests-create", 0, 0, 640, 480);
+	auto* window = new Client::Window("window-tests-create", 0, 0, 640, 480);
 	REQUIRE(*window);
 	i32 x, y, w, h;
 	window->GetPosition(x, y);
@@ -30,7 +31,7 @@ TEST_CASE("window-tests-create")
 
 TEST_CASE("window-tests-position")
 {
-	auto* window = new Window("window-tests-position", 0, 0, 640, 480);
+	auto* window = new Client::Window("window-tests-position", 0, 0, 640, 480);
 	REQUIRE(*window);
 	i32 x = 32, y = 32;
 	window->SetPosition(x, y);
@@ -44,7 +45,7 @@ TEST_CASE("window-tests-position")
 
 TEST_CASE("window-tests-size")
 {
-	auto* window = new Window("window-tests-size", 0, 0, 640, 480);
+	auto* window = new Client::Window("window-tests-size", 0, 0, 640, 480);
 	REQUIRE(*window);
 	i32 w = 32, h = 32;
 	window->SetPosition(w, h);
@@ -58,12 +59,18 @@ TEST_CASE("window-tests-size")
 
 TEST_CASE("window-tests-platformdata")
 {
-	auto* window = new Window("window-tests-size", 0, 0, 640, 480);
+	auto* window = new Client::Window("window-tests-size", 0, 0, 640, 480);
 	REQUIRE(*window);
 	auto platformData = window->GetPlatformData();
 #if PLATFORM_WINDOWS
 	HWND hwnd = (HWND)platformData.handle_;
 	REQUIRE(::IsWindow(hwnd));
+#elif PLATFORM_LINUX
+	//XWindowAttributes xwinAtts;
+	//Display* display = (Display*)platformData.display_;
+	//XID xwindow = (XID)platformData.handle_;
+	//Status status = XGetWindowAttributes(display, xwindow, &xwinAtts);
+	//REQUIRE(status != BadWindow);
 #else
 #error "Need test for platform!"
 #endif

@@ -126,7 +126,11 @@ namespace Client
 	};
 
 	static const i32 SCAN_CODE_BIT = (1 << 30);
+#if defined(_MSC_VER)
 #define SCANCODE_TO_KEYCODE(CODE) (KeyCode)((i32)CODE | SCAN_CODE_BIT)
+#else
+#define SCANCODE_TO_KEYCODE(CODE) ((i32)CODE | SCAN_CODE_BIT)
+#endif
 
 	/**
 	 * Key codes. Based on SDL2's key codes.
