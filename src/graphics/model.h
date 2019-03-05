@@ -40,7 +40,7 @@ namespace Graphics
 		ModelMeshDraw GetMeshDraw(i32 meshIdx) const;
 
 		/// @return Material for @a meshIdx.
-		Material* Model::GetMeshMaterial(i32 meshIdx) const;
+		Material* GetMeshMaterial(i32 meshIdx) const;
 
 		/// @return Mesh world transform.
 		Math::Mat44 GetMeshWorldTransform(i32 meshIdx) const;

@@ -1,15 +1,14 @@
+#include "gpu/enum.h"
 #include "graphics/converters/import_texture.h"
 #include "graphics/texture.h"
 #include "resource/converter.h"
 #include "core/array.h"
 #include "core/debug.h"
-#include "core/enum.h"
 #include "core/file.h"
 #include "core/hash.h"
 #include "core/misc.h"
 #include "core/vector.h"
 
-#include "gpu/enum.h"
 #include "gpu/resources.h"
 #include "gpu/utils.h"
 

@@ -2,6 +2,8 @@
 
 #include "resource/dll.h"
 
+#include <cstddef>
+
 namespace Core
 {
 	class UUID;

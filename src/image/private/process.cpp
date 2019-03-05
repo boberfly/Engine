@@ -14,6 +14,7 @@
 #include <squish.h>
 
 #include <cmath>
+#include <cstring>
 #include <utility>
 
 namespace

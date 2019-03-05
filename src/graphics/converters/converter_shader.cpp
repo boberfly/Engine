@@ -24,6 +24,7 @@
 #include "graphics/converters/shader_preprocessor.h"
 
 #include <cstring>
+#include <cstdlib> // for atoi
 
 #define DEBUG_DUMP_SHADERS 1
 

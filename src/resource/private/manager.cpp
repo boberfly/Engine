@@ -1,5 +1,3 @@
-#pragma once
-
 #include "resource/manager.h"
 #include "resource/converter.h"
 #include "resource/factory.h"
@@ -29,6 +27,7 @@
 #include "Remotery.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <utility>
 
 namespace Resource

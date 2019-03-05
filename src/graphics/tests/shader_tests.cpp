@@ -7,6 +7,8 @@
 #include "math/mat44.h"
 #include "test_shared.h"
 
+#include <climits>
+
 namespace
 {
 	class Window

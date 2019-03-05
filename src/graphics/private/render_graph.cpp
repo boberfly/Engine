@@ -19,6 +19,7 @@
 #include "Remotery.h"
 
 #include <algorithm>
+#include <cstdio>
 
 namespace
 {

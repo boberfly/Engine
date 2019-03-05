@@ -7,6 +7,9 @@ extern "C" {
 #include <fpp.h>
 }
 
+#include <cstdio>
+#include <cstring>
+
 namespace
 {
 	Core::Mutex fppMutex_;

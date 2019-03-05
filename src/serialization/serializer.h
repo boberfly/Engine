@@ -1,11 +1,15 @@
 #pragma once
 
 #include "serialization/dll.h"
+#include "core/enum.h"
 #include "core/types.h"
 #include "core/map.h"
 #include "core/string.h"
 #include "core/vector.h"
+#include "core/os.h"
+#include "gpu/enum.h"
 
+#include <cstring>
 #include <type_traits>
 
 namespace Core

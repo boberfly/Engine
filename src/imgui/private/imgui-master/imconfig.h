@@ -17,10 +17,14 @@
 //#define IM_ASSERT(_EXPR) DBG_ASSERT(_EXPR)
 
 //---- Define attributes of all API symbols declarations, e.g. for DLL under Windows.
+#if MSVC_VER
 #if IMGUI_EXPORT
 #define IMGUI_API __declspec(dllexport)
 #else
 #define IMGUI_API __declspec(dllimport)
+#endif
+#else
+#define IMGUI_API
 #endif
 
 #define ImDrawIdx u32

@@ -1,10 +1,10 @@
 #pragma once
 
 #include "core/types.h"
-#include "core/enum.h"
 #include "core/map.h"
 #include "core/set.h"
 #include "core/string.h"
+#include "gpu/enum.h"
 #include "graphics/converters/shader_ast.h"
 
 #pragma warning(push)

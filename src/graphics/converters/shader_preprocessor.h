@@ -23,10 +23,10 @@ namespace Graphics
 		const Core::Vector<const char*> GetDependencies() const { return dependencies_; }
 
 	private:
-		static void ShaderPreprocessor::cbError(void* userData, char* format, va_list varArgs);
-		static char* ShaderPreprocessor::cbInput(char* buffer, int size, void* userData);
-		static void ShaderPreprocessor::cbOutput(int inChar, void* userData);
-		static void ShaderPreprocessor::cbDependency(char* dependency, void* userData);
+		static void cbError(void* userData, char* format, va_list varArgs);
+		static char* cbInput(char* buffer, int size, void* userData);
+		static void cbOutput(int inChar, void* userData);
+		static void cbDependency(char* dependency, void* userData);
 
 		Core::Vector<fppTag> tags_;
 		char* inputData_;

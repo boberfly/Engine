@@ -1,5 +1,6 @@
 #pragma once
 
+#include "gpu/enum.h"
 #include "core/types.h"
 #include "core/enum.h"
 #include "core/map.h"

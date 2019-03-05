@@ -14,6 +14,7 @@
 
 #elif PLATFORM_POSIX
 
+#define strcat_s(dst, sz, src) strncat(dst, src, sz)
 #define strcpy_s(dst, sz, src) strncpy(dst, src, sz)
 #define sprintf_s snprintf
 #define _snprintf snprintf
