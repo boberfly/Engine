@@ -8,6 +8,10 @@
 #include <cstdlib>
 #include <new>
 
+#if PLATFORM_POSIX
+#include <sys/mman.h>
+#endif
+
 namespace Core
 {
 	namespace

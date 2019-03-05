@@ -4,6 +4,8 @@
 #include "core/random.h"
 #include "core/vector.h"
 
+#include <string.h>
+
 #include "catch.hpp"
 
 namespace

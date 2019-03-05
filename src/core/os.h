@@ -12,14 +12,14 @@
 #undef LoadImage
 #undef TRANSPARENT
 
-#elif defined(PLATFORM_LINUX) || defined(PLATFORM_ANDROID) || defined(PLATFORM_OSX) || defined(PLATFORM_IOS)
-#include <pthread.h>
-#include <sys/mman.h>
-#include <unistd.h>
+#elif PLATFORM_POSIX
 
+#define strcpy_s(dst, sz, src) strncpy(dst, src, sz)
+#define sprintf_s snprintf
 #define _snprintf snprintf
 #define _vsnprintf vsnprintf
 #define _stricmp strcasecmp
 #define _strnicmp strncasecmp
+#define vsprintf_s vsnprintf
 
 #endif

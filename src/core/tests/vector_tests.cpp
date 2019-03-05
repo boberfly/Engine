@@ -1,4 +1,5 @@
 #include "core/array.h"
+#include "core/os.h"
 #include "core/vector.h"
 
 #include "catch.hpp"

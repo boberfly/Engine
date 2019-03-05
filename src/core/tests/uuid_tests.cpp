@@ -2,6 +2,8 @@
 #include "core/debug.h"
 #include "core/random.h"
 
+#include <string.h>
+
 #include "catch.hpp"
 
 TEST_CASE("uuid-tests-string")

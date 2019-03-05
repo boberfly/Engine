@@ -525,8 +525,10 @@ namespace Core
 	}
 
 } // namespace Core
-#elif defined(PLATFORM_LINUX) || defined(PLATFORM_ANDROID) || defined(PLATFORM_OSX) || defined(PLATFORM_IOS)
+#elif PLATFORM_POSIX
 #include "core/os.h"
+#include <pthread.h>
+#include <unistd.h>
 #include <sc.h>
 #include <stdlib.h> // for atoi
 #include "core/file.h"
