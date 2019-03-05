@@ -1,5 +1,3 @@
-#pragma once
-
 #include "image/process.h"
 #include "image/image.h"
 #include "image/ispc/image_processing_ispc.h"
