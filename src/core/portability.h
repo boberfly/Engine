@@ -6,16 +6,22 @@
 #if defined(EMSCRIPTEN) || defined(__EMSCRIPTEN__)
 #undef PLATFORM_HTML5
 #define PLATFORM_HTML5 1
+#undef PLATFORM_POSIX
+#define PLATFORM_POSIX 1
 
 // Android
 #elif defined(__ANDROID__)
 #undef PLATFORM_ANDROID
 #define PLATFORM_ANDROID 1
+#undef PLATFORM_POSIX
+#define PLATFORM_POSIX 1
 
 // Linux
 #elif defined(linux) || defined(__linux)
 #undef PLATFORM_LINUX
 #define PLATFORM_LINUX 1
+#undef PLATFORM_POSIX
+#define PLATFORM_POSIX 1
 
 // Windows
 #elif defined(WINDOWS) || defined(_WINDOWS)
@@ -31,11 +37,15 @@
 #elif defined(__APPLE__) && (TARGET_OS_IPHONE || TARGET_IPHONE_SIMULATOR)
 #undef PLATFORM_IOS
 #define PLATFORM_IOS 1
+#undef PLATFORM_POSIX
+#define PLATFORM_POSIX 1
 
 // Mac OSX
 #elif defined(__APPLE__) && defined(__MACH__)
 #undef PLATFORM_OSX
 #define PLATFORM_OSX 1
+#undef PLATFORM_POSIX
+#define PLATFORM_POSIX 1
 
 // Error.
 #else
@@ -103,7 +113,7 @@
 #if defined(__GNU__) || defined(__GNUG__)
 #define COMPILER_GCC 1
 #define NOEXCEPT noexcept
-#define FORCEINLINE
+#define FORCEINLINE __attribute__((always_inline)) inline
 #else
 #define COMPILER_GCC 0
 #endif
@@ -112,7 +122,7 @@
 #if defined(__llvm__)
 #define COMPILER_CLANG 1
 #define NOEXCEPT noexcept
-#define FORCEINLINE
+#define FORCEINLINE __attribute__((always_inline)) inline
 #else
 #define COMPILER_CLANG 0
 #endif
