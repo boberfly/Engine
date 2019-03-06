@@ -528,6 +528,7 @@ namespace Core
 #elif PLATFORM_POSIX
 #include "core/os.h"
 #include <pthread.h>
+//#include <climits>
 #include <unistd.h>
 #include <sc.h>
 #include <cstdlib> // for atoi
@@ -613,9 +614,9 @@ namespace Core
 		int res = pthread_attr_init(&attr);
 		DBG_ASSERT(res == 0);
 		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-		res = pthread_attr_setstacksize(&attr, stackSize);
-		DBG_ASSERT(res == 0);
-		res = pthread_create(&(impl_->threadHandle_), &attr, ThreadEntryPoint, this);
+		//res = pthread_attr_setstacksize(&attr, stackSize);
+		//DBG_ASSERT(res == 0);
+		res = pthread_create(&(impl_->threadHandle_), &attr, ThreadEntryPoint, impl_);
 		DBG_ASSERT(res == 0);
 #if !defined(_RELEASE)
 		impl_->debugName_ = debugName;
@@ -666,9 +667,7 @@ namespace Core
 			auto thread = impl_->threadHandle_;
 			if(thread)
 			{
-				void *status;
-				pthread_join(thread, &status);
-				exitCode = *(i32*)status;
+				pthread_join(thread, (void **)&exitCode);
 			}
 			DBG_ASSERT(exitCode);
 			delete impl_;
