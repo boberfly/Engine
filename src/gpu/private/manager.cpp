@@ -10,6 +10,7 @@
 #include "core/handle.h"
 #include "core/library.h"
 #include "core/misc.h"
+#include "core/os.h"
 #include "core/string.h"
 #include "core/timer.h"
 #include "core/vector.h"
@@ -21,7 +22,9 @@
 #include "Remotery.h"
 
 #include <cstdlib>
+#include <cstdio>
 #include <cstdarg>
+#include <cstring>
 #include <utility>
 
 #define ENABLE_TEMP_DEBUG_INFO (0)

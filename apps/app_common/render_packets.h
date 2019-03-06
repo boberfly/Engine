@@ -10,6 +10,7 @@
 
 #include "common.h"
 
+#include <climits>
 #include <cstring>
 
 using CustomBindFn = Core::Function<bool(Graphics::Shader*, Graphics::ShaderTechnique&)>;

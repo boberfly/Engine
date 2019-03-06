@@ -10,6 +10,7 @@
 
 #if PLATFORM_POSIX
 #include <sys/mman.h>
+#include <unistd.h>
 #endif
 
 namespace Core
@@ -33,7 +34,7 @@ namespace Core
 
 		void* VirtualCommit(void* mem, i64 size) { return ::VirtualAlloc(mem, size, MEM_COMMIT, PAGE_READWRITE); }
 
-#elif defined(PLATFORM_LINUX) || defined(PLATFORM_ANDROID) || defined(PLATFORM_OSX) || defined(PLATFORM_IOS)
+#elif PLATFORM_POSIX
 		void VirtualGetInfo(i64& pageSize, i64& granularity)
 		{
 			pageSize = sysconf(_SC_PAGESIZE);

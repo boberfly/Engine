@@ -5,6 +5,7 @@
 #include "core/concurrency.h"
 #include "core/linear_allocator.h"
 #include "core/misc.h"
+#include "core/os.h"
 #include "core/set.h"
 #include "core/string.h"
 #include "core/vector.h"
@@ -20,6 +21,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 
 namespace
 {

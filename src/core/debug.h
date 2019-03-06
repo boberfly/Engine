@@ -4,6 +4,9 @@
 #include "core/types.h"
 
 #include <stdarg.h>
+#ifdef PLATFORM_POSIX
+#include <signal.h>
+#endif
 
 namespace Core
 {
@@ -85,13 +88,15 @@ namespace Core
 #if !defined(_RELEASE)
 #if PLATFORM_WINDOWS
 #define DBG_BREAK __debugbreak()
+#elif PLATFORM_POSIX
+#define DBG_BREAK raise(SIGTRAP)
 #else
 #define DBG_BREAK
 #endif
 #define DBG_ASSERT_MSG(Condition, Message, ...)                                                                        \
 	if(!(Condition))                                                                                                   \
 	{                                                                                                                  \
-		if(Core::AssertInternal(Message, __FILE__, __LINE__, __VA_ARGS__))                                             \
+		if(Core::AssertInternal(Message, __FILE__, __LINE__, ##__VA_ARGS__))                                           \
 			DBG_BREAK;                                                                                                 \
 	}
 #define DBG_ASSERT(Condition)                                                                                          \

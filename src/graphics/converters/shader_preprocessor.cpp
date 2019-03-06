@@ -1,5 +1,6 @@
 #include "graphics/converters/shader_preprocessor.h"
 #include "core/concurrency.h"
+#include "core/os.h"
 
 extern "C" {
 #undef INLINE

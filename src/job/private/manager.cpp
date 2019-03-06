@@ -2,12 +2,15 @@
 #include "core/concurrency.h"
 #include "core/misc.h"
 #include "core/mpmc_bounded_queue.h"
+#include "core/os.h"
 #include "core/string.h"
 #include "core/timer.h"
 #include "core/vector.h"
 
 #include "Remotery.h"
 
+#include <cstdio>
+#include <cstring>
 #include <utility>
 
 #define VERBOSE_LOGGING (0)
