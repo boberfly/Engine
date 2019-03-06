@@ -610,10 +610,12 @@ namespace Core
 		impl_->userData_ = userData;
 		impl_->threadHandle_ = -1;
 		pthread_attr_t attr;
-		pthread_attr_init(&attr);
+		int res = pthread_attr_init(&attr);
+		DBG_ASSERT(res == 0);
 		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
-		pthread_attr_setstacksize(&attr, stackSize);
-		int res = pthread_create(&(impl_->threadHandle_), &attr, ThreadEntryPoint, this);
+		res = pthread_attr_setstacksize(&attr, stackSize);
+		DBG_ASSERT(res == 0);
+		res = pthread_create(&(impl_->threadHandle_), &attr, ThreadEntryPoint, this);
 		DBG_ASSERT(res == 0);
 #if !defined(_RELEASE)
 		impl_->debugName_ = debugName;
@@ -1005,7 +1007,7 @@ namespace Core
 	RWLock::~RWLock()
 	{
 #if !defined(_RELEASE)
-		if(!pthread_rwlock_trywrlock(&(Get()->srwLock_)))
+		if(pthread_rwlock_trywrlock(&(Get()->srwLock_)))
 			DBG_ASSERT(false);
 #endif
 		i32 ret = pthread_rwlock_destroy(&(Get()->srwLock_));

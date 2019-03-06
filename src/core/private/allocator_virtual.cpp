@@ -38,7 +38,7 @@ namespace Core
 		void VirtualGetInfo(i64& pageSize, i64& granularity)
 		{
 			pageSize = sysconf(_SC_PAGESIZE);
-			granularity = 0;
+			granularity = pageSize;
 		}
 
 		void* VirtualAllocate(i64 size) { return mmap(nullptr, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0); }
@@ -47,7 +47,7 @@ namespace Core
 
 		void* VirtualReserve(i64 size) { return mmap(nullptr, size, PROT_NONE, MAP_PRIVATE|MAP_ANON, -1, 0); }
 
-		void* VirtualCommit(void* mem, i64 size) { return mmap(mem, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0); }
+		void* VirtualCommit(void* mem, i64 size) { return mmap(mem, size, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON|MAP_FIXED, -1, 0); }
 
 #endif
 
