@@ -677,17 +677,14 @@ namespace Core
 		return 0;
 	}
 
-	/// Use Fiber Local Storage to store current fiber.
-	static FLS thisFiber_;
-
 	struct FiberImpl
 	{
 		Fiber* parent_ = nullptr;
 		sc_context_t fiber_ = nullptr;
 		u8* stack_ = nullptr;
-		//sc_context_t exitFiber_ = nullptr;
+		sc_context_t exitFiber_ = nullptr;
 		Fiber::EntryPointFunc entryPointFunc_ = nullptr;
-		//void* userData_ = nullptr;
+		void* userData_ = nullptr;
 #if !defined(_RELEASE)
 		Core::String debugName_;
 #endif
@@ -696,9 +693,9 @@ namespace Core
 	static void FiberEntryPoint(void* parameter)
 	{
 		auto* impl = reinterpret_cast<FiberImpl*>(parameter);
-		thisFiber_.Set(impl);
+		sc_set_data(impl->fiber_, (void*)impl);
 
-		impl->entryPointFunc_(sc_get_data(impl->fiber_));
+		impl->entryPointFunc_(impl->userData_);
 		if( sc_context_t parent = sc_parent_context() )
 		{
 			if( parent != sc_main_context() )
@@ -716,6 +713,7 @@ namespace Core
 		impl_->parent_ = this;
 		impl_->entryPointFunc_ = entryPointFunc;
 		impl_->stack_ = new u8[stackSize];
+		impl_->userData_ = userData;
 		impl_->fiber_ = sc_context_create(impl_->stack_, stackSize, &FiberEntryPoint);
 #if !defined(_RELEASE)
 		impl_->debugName_ = debugName_;
@@ -727,7 +725,6 @@ namespace Core
 			delete impl_;
 			impl_ = nullptr;
 		}
-		sc_set_data(impl_->fiber_, userData);
 	}
 
 	Fiber::Fiber(ThisThread, const char* debugName)
@@ -735,11 +732,14 @@ namespace Core
 	    : debugName_(debugName)
 #endif
 	{
+		sc_context_t threadFiber = sc_main_context();
 		impl_ = new FiberImpl();
 		impl_->parent_ = this;
 		impl_->entryPointFunc_ = nullptr;
 		impl_->stack_ = new u8[DEFAULT_STACK_SIZE];
-		impl_->fiber_ = sc_context_create(impl_->stack_, DEFAULT_STACK_SIZE, &FiberEntryPoint);
+		impl_->userData_ = nullptr;
+		threadFiber = sc_context_create(impl_->stack_, DEFAULT_STACK_SIZE, &FiberEntryPoint);
+		impl_->fiber_ = threadFiber;
 #if !defined(_RELEASE)
 		impl_->debugName_ = debugName_;
 #endif
@@ -786,11 +786,13 @@ namespace Core
 	{
 		DBG_ASSERT(impl_);
 		DBG_ASSERT(impl_->parent_ == this);
-		DBG_ASSERT(sc_current_context() != nullptr);
 		if(impl_)
 		{
 			DBG_ASSERT(sc_current_context() != impl_->fiber_);
-			sc_switch(impl_->fiber_, nullptr);
+			sc_context_t lastExitFiber = impl_->exitFiber_;
+			impl_->exitFiber_ = impl_->entryPointFunc_ ? sc_current_context() : sc_parent_context();
+			sc_switch(impl_->fiber_, impl_);
+			impl_->exitFiber_ = lastExitFiber;
 		}
 	}
 
@@ -798,14 +800,13 @@ namespace Core
 	{
 		DBG_ASSERT(impl_);
 		DBG_ASSERT(impl_->parent_ == this);
-		//return impl_->userData_;
-		return sc_get_data(impl_->fiber_);
+		return impl_->userData_;
 	}
 
 	Fiber* Fiber::GetCurrentFiber()
 	{
-		//return sc_current_context();
-		auto* impl = (FiberImpl*)thisFiber_.Get();
+		sc_context_t current = sc_current_context();
+		auto* impl = (FiberImpl*)sc_get_data(current);
 		if(impl)
 			return impl->parent_;
 		return nullptr;
@@ -1066,31 +1067,27 @@ namespace Core
 
 	struct FLSImpl
 	{
-		pthread_key_t key_;
+		sc_context_t context_;
 	};
 
-	FLS::FLS() : key_(0)
+	FLS::FLS() : context_(nullptr)
 	{
-		i32 res = pthread_key_create(&key_, nullptr);
-		DBG_ASSERT(res == 0);
+		context_ = sc_current_context();
 	}
 
 	FLS::~FLS()
 	{
-		i32 res = pthread_key_delete(key_);
-		DBG_ASSERT(res == 0);
 	}
 
 	bool FLS::Set(void* data)
 	{
-		i32 res = pthread_setspecific(key_, data);
-		DBG_ASSERT(res == 0);
-		return !res;
+		sc_set_data((sc_context_t)context_, data);
+		return true;
 	}
 
 	void* FLS::Get() const
 	{
-		return pthread_getspecific(key_);
+		return sc_get_data((sc_context_t)context_);
 	}
 
 } // namespace Core

@@ -522,7 +522,7 @@ namespace Core
 		union
 		{
 			i32 handle_;
-			u32 key_;
+			void* context_;
 		};
 	};
 
